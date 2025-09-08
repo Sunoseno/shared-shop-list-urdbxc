@@ -11,8 +11,12 @@ interface ShoppingListCardProps {
 }
 
 export default function ShoppingListCard({ list, onPress }: ShoppingListCardProps) {
-  const activeItemsCount = list.items.filter(item => !item.isDone).length;
-  const completedItemsCount = list.items.filter(item => item.isDone).length;
+  console.log('Rendering ShoppingListCard for list:', list.name, 'with items:', list.items);
+  
+  // Ensure items array exists and has the correct property names
+  const items = list.items || [];
+  const activeItemsCount = items.filter(item => !item.done).length;
+  const completedItemsCount = items.filter(item => item.done).length;
 
   return (
     <TouchableOpacity 
@@ -38,7 +42,7 @@ export default function ShoppingListCard({ list, onPress }: ShoppingListCardProp
         </View>
         <View style={styles.stat}>
           <Icon name="people" size={16} color={colors.accent} />
-          <Text style={styles.statText}>{list.members.length} members</Text>
+          <Text style={styles.statText}>{(list.members || []).length} members</Text>
         </View>
       </View>
     </TouchableOpacity>

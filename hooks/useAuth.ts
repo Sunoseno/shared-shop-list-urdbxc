@@ -9,35 +9,63 @@ export const useAuth = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('Initial session:', session);
-      setSession(session);
-      setUser(session?.user ?? null);
+    console.log('useAuth: Initializing auth');
+    
+    // Get initial session with timeout
+    const initAuth = async () => {
+      try {
+        console.log('useAuth: Getting initial session');
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('useAuth: Error getting session:', error);
+        } else {
+          console.log('useAuth: Initial session:', session?.user?.email || 'no session');
+          setSession(session);
+          setUser(session?.user ?? null);
+        }
+      } catch (error) {
+        console.error('useAuth: Failed to get initial session:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    // Set a timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.log('useAuth: Auth timeout, setting loading to false');
       setLoading(false);
+    }, 5000);
+
+    initAuth().then(() => {
+      clearTimeout(timeoutId);
     });
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('Auth state changed:', _event, session);
+      console.log('useAuth: Auth state changed:', _event, session?.user?.email || 'no session');
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeoutId);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signInAnonymously = async () => {
     try {
+      console.log('useAuth: Signing in anonymously');
       const { data, error } = await supabase.auth.signInAnonymously();
       if (error) {
         console.error('Error signing in anonymously:', error);
         throw error;
       }
-      console.log('Signed in anonymously:', data);
+      console.log('Signed in anonymously:', data.user?.email || 'anonymous');
       return data;
     } catch (error) {
       console.error('Anonymous sign in failed:', error);
@@ -47,6 +75,7 @@ export const useAuth = () => {
 
   const signInWithEmail = async (email: string) => {
     try {
+      console.log('useAuth: Signing in with email:', email);
       const { data, error } = await supabase.auth.signInWithOtp({
         email,
         options: {
@@ -67,6 +96,7 @@ export const useAuth = () => {
 
   const signOut = async () => {
     try {
+      console.log('useAuth: Signing out');
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error('Error signing out:', error);

@@ -8,6 +8,8 @@ import { useSupabaseShoppingLists } from './useSupabaseShoppingLists';
 import uuid from 'react-native-uuid';
 
 export const useShoppingLists = () => {
+  console.log('useShoppingLists: Initializing');
+  
   const { user, loading: authLoading } = useAuth();
   const supabaseHook = useSupabaseShoppingLists();
   
@@ -17,12 +19,16 @@ export const useShoppingLists = () => {
   // Use Supabase if user is authenticated, otherwise use local state
   const isUsingSupabase = !!user;
   
+  console.log('useShoppingLists: Using Supabase:', isUsingSupabase, 'Auth loading:', authLoading);
+  
   const shoppingLists = isUsingSupabase ? (supabaseHook.shoppingLists || []) : localShoppingLists;
   const loading = isUsingSupabase ? supabaseHook.loading : false;
 
+  console.log('useShoppingLists: Final state - loading:', loading, 'lists:', shoppingLists?.length || 0);
+
   // Local implementations for anonymous users
   const localAddItem = (listId: string, itemName: string) => {
-    console.log('Adding item locally:', itemName, 'to list:', listId);
+    console.log('useShoppingLists: Adding item locally:', itemName, 'to list:', listId);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -47,7 +53,7 @@ export const useShoppingLists = () => {
   };
 
   const localToggleItemDone = (listId: string, itemId: string) => {
-    console.log('Toggling item locally:', itemId);
+    console.log('useShoppingLists: Toggling item locally:', itemId);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -87,7 +93,7 @@ export const useShoppingLists = () => {
   };
 
   const localUpdateItemDescription = (listId: string, itemId: string, description: string) => {
-    console.log('Updating item description locally:', itemId, description);
+    console.log('useShoppingLists: Updating item description locally:', itemId, description);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -104,7 +110,7 @@ export const useShoppingLists = () => {
   };
 
   const localUpdateItemName = (listId: string, itemId: string, newName: string) => {
-    console.log('Updating item name locally:', itemId, newName);
+    console.log('useShoppingLists: Updating item name locally:', itemId, newName);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -121,7 +127,7 @@ export const useShoppingLists = () => {
   };
 
   const localSetItemRepeat = (listId: string, itemId: string) => {
-    console.log('Setting item repeat locally:', itemId);
+    console.log('useShoppingLists: Setting item repeat locally:', itemId);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -144,7 +150,7 @@ export const useShoppingLists = () => {
   };
 
   const localRemoveItem = (listId: string, itemId: string) => {
-    console.log('Removing item locally:', itemId);
+    console.log('useShoppingLists: Removing item locally:', itemId);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -159,7 +165,7 @@ export const useShoppingLists = () => {
   };
 
   const localCreateList = (listName: string, initialMembers: string[] = []) => {
-    console.log('Creating list locally:', listName, 'with members:', initialMembers);
+    console.log('useShoppingLists: Creating list locally:', listName, 'with members:', initialMembers);
     const newList: ShoppingList = {
       id: uuid.v4() as string,
       name: listName,
@@ -171,7 +177,7 @@ export const useShoppingLists = () => {
   };
 
   const localInviteMember = (listId: string, email: string) => {
-    console.log('Inviting member locally:', email, 'to list:', listId);
+    console.log('useShoppingLists: Inviting member locally:', email, 'to list:', listId);
     Alert.alert(
       'Offline Mode',
       'Email invitations are not available in offline mode. Please sign in to invite members via email.'
@@ -179,7 +185,7 @@ export const useShoppingLists = () => {
   };
 
   const localRemoveMember = (listId: string, email: string) => {
-    console.log('Removing member locally:', email, 'from list:', listId);
+    console.log('useShoppingLists: Removing member locally:', email, 'from list:', listId);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -194,7 +200,7 @@ export const useShoppingLists = () => {
   };
 
   const localClearListHistory = (listId: string) => {
-    console.log('Clearing history locally for list:', listId);
+    console.log('useShoppingLists: Clearing history locally for list:', listId);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -209,7 +215,7 @@ export const useShoppingLists = () => {
   };
 
   const localUpdateItemOrder = (listId: string, itemId: string, newIndex: number) => {
-    console.log('Updating item order locally:', itemId, 'to index:', newIndex);
+    console.log('useShoppingLists: Updating item order locally:', itemId, 'to index:', newIndex);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {

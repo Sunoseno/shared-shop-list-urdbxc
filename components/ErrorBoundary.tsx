@@ -1,53 +1,82 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { colors } from '../styles/commonStyles';
+import { colors, commonStyles } from '../styles/commonStyles';
 import Button from './Button';
 
-interface ErrorBoundaryProps {
-  error?: string;
-  onRetry?: () => void;
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
 }
 
-export default function ErrorBoundary({ error = 'Something went wrong', onRetry }: ErrorBoundaryProps) {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Oops!</Text>
-      <Text style={styles.message}>{error}</Text>
-      {onRetry && (
-        <Button
-          text="Try Again"
-          onPress={onRetry}
-          style={styles.retryButton}
-        />
-      )}
-    </View>
-  );
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+export default class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    console.error('ErrorBoundary caught an error:', error);
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('ErrorBoundary componentDidCatch:', error, errorInfo);
+  }
+
+  handleReset = () => {
+    console.log('ErrorBoundary: Resetting error state');
+    this.setState({ hasError: false, error: undefined });
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={[commonStyles.container, styles.errorContainer]}>
+          <Text style={styles.errorTitle}>Something went wrong</Text>
+          <Text style={styles.errorMessage}>
+            {this.state.error?.message || 'An unexpected error occurred'}
+          </Text>
+          <Button
+            text="Try Again"
+            onPress={this.handleReset}
+            style={styles.retryButton}
+          />
+        </View>
+      );
+    }
+
+    return this.props.children;
+  }
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  errorContainer: {
+    padding: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
-    padding: 20,
   },
-  title: {
+  errorTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: colors.text,
-    marginBottom: 12,
+    color: colors.error,
+    marginBottom: 16,
+    textAlign: 'center',
   },
-  message: {
+  errorMessage: {
     fontSize: 16,
     color: colors.text,
+    marginBottom: 32,
     textAlign: 'center',
-    marginBottom: 20,
     opacity: 0.8,
   },
   retryButton: {
     backgroundColor: colors.accent,
-    minWidth: 120,
+    paddingHorizontal: 32,
+    paddingVertical: 12,
   },
 });

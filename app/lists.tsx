@@ -9,37 +9,43 @@ import CreateListModal from '../components/CreateListModal';
 import Button from '../components/Button';
 
 export default function ListsScreen() {
+  console.log('ListsScreen: Rendering');
+  
   const { shoppingLists, createList, loading } = useShoppingLists();
   const [showCreateModal, setShowCreateModal] = useState(false);
+
+  console.log('ListsScreen: State - loading:', loading, 'lists count:', shoppingLists?.length || 0);
 
   // Auto-redirect if only one list
   useEffect(() => {
     if (!loading && shoppingLists && shoppingLists.length === 1) {
-      console.log('Auto-redirecting to single list:', shoppingLists[0].id);
+      console.log('ListsScreen: Auto-redirecting to single list:', shoppingLists[0].id);
       router.replace(`/list/${shoppingLists[0].id}`);
     }
   }, [shoppingLists, loading]);
 
   const handleCreateList = (name: string, members: string[]) => {
-    console.log('Creating list:', name, 'with members:', members);
+    console.log('ListsScreen: Creating list:', name, 'with members:', members);
     createList(name, members);
     setShowCreateModal(false);
   };
 
   const handleListPress = (listId: string) => {
-    console.log('Navigating to list:', listId);
+    console.log('ListsScreen: Navigating to list:', listId);
     router.push(`/list/${listId}`);
   };
 
   if (loading) {
+    console.log('ListsScreen: Showing loading state');
     return (
       <View style={commonStyles.container}>
-        <Text style={commonStyles.text}>Loading...</Text>
+        <Text style={commonStyles.text}>Loading shopping lists...</Text>
       </View>
     );
   }
 
   if (!shoppingLists || shoppingLists.length === 0) {
+    console.log('ListsScreen: Showing empty state');
     return (
       <View style={commonStyles.container}>
         <View style={styles.emptyState}>
@@ -61,6 +67,8 @@ export default function ListsScreen() {
       </View>
     );
   }
+
+  console.log('ListsScreen: Showing lists:', shoppingLists.map(l => l.name));
 
   return (
     <View style={commonStyles.wrapper}>

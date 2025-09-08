@@ -9,6 +9,7 @@ import { setupErrorLogging } from '../utils/errorLogger';
 import { useAuth } from '../hooks/useAuth';
 import AuthScreen from '../components/AuthScreen';
 import LoadingSpinner from '../components/LoadingSpinner';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 const STORAGE_KEY = 'natively_emulate_mobile';
 
@@ -19,6 +20,7 @@ function RootLayout() {
   const globalParams = useGlobalSearchParams();
 
   useEffect(() => {
+    console.log('RootLayout: Setting up error logging');
     setupErrorLogging();
     
     if (Platform.OS === 'web') {
@@ -41,7 +43,10 @@ function RootLayout() {
     }
   }, [globalParams.emulate]);
 
+  console.log('RootLayout: Auth state - loading:', loading, 'user:', user?.email || 'anonymous');
+
   if (loading) {
+    console.log('RootLayout: Showing loading spinner');
     return (
       <SafeAreaProvider>
         <SafeAreaView style={[commonStyles.container, { paddingTop: insets.top }]}>
@@ -52,21 +57,21 @@ function RootLayout() {
     );
   }
 
-  // Show auth screen if no user (but allow anonymous usage)
-  // For now, we'll skip the auth screen and allow anonymous usage by default
-  // Users can still sign in through the app if they want sync features
+  console.log('RootLayout: Rendering main app');
 
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={[commonStyles.container, { paddingTop: insets.top }]}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="index" />
-          <Stack.Screen name="lists" />
-          <Stack.Screen name="list/[id]" />
-        </Stack>
-        <StatusBar style="auto" />
-      </SafeAreaView>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <SafeAreaView style={[commonStyles.container, { paddingTop: insets.top }]}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="lists" />
+            <Stack.Screen name="list/[id]" />
+          </Stack>
+          <StatusBar style="auto" />
+        </SafeAreaView>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
 

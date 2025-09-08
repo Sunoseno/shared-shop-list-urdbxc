@@ -5,11 +5,11 @@ export const colors = {
   primary: '#162456',    // Material Blue
   secondary: '#193cb8',  // Darker Blue
   accent: '#64B5F6',     // Light Blue
-  background: '#101824',  // Dark background
-  backgroundAlt: '#162133',  // Darker background
-  text: '#e3e3e3',       // Light text
-  grey: '#90CAF9',       // Light Blue Grey
-  card: '#193cb8',       // Dark card background
+  background: '#f5f5f5', // Light background for better visibility
+  backgroundAlt: '#ffffff', // White background for cards
+  text: '#333333',       // Dark text for better readability
+  grey: '#666666',       // Grey for secondary text
+  card: '#ffffff',       // White card background
   success: '#4CAF50',    // Green for completed items
   warning: '#FF9800',    // Orange for warnings
   error: '#F44336',      // Red for errors
@@ -89,6 +89,6 @@ export const commonStyles = StyleSheet.create({
   icon: {
     width: 60,
     height: 60,
-    tintColor: "white",
+    tintColor: colors.text,
   },
 });
