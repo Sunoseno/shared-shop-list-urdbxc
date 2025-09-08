@@ -15,16 +15,15 @@ import EditDescriptionModal from '../../components/EditDescriptionModal';
 export default function ListDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { 
-    lists, 
-    currentUser,
-    addItemToList, 
+    shoppingLists, 
+    user,
+    addItem, 
     toggleItemDone, 
-    updateItemRepeating, 
+    setItemRepeat, 
     updateItemDescription,
     updateItemName,
-    reorderItems,
-    addHistoryItemBackToList,
-    clearHistory,
+    updateItemOrder,
+    clearListHistory,
     inviteMember,
     removeMember
   } = useShoppingLists();
@@ -36,7 +35,7 @@ export default function ListDetailScreen() {
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ['25%', '50%', '90%'], []);
 
-  const list = lists.find(l => l.id === id);
+  const list = shoppingLists?.find(l => l.id === id);
 
   if (!list) {
     return (
@@ -47,17 +46,28 @@ export default function ListDetailScreen() {
     );
   }
 
-  const activeItems = list.items
-    .filter(item => !item.isDone)
-    .sort((a, b) => a.order - b.order);
-  const completedItems = list.items.filter(item => item.isDone);
-  const historyItems = list.history.sort((a, b) => 
-    (b.completedAt?.getTime() || 0) - (a.completedAt?.getTime() || 0)
-  );
-  const isOwner = list.owner === currentUser.email;
+  // Filter items safely with null checks
+  const activeItems = (list.items || [])
+    .filter(item => !item.done)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  
+  const completedItems = (list.items || [])
+    .filter(item => item.done && item.doneAt && (Date.now() - new Date(item.doneAt).getTime()) < 30000);
+  
+  const historyItems = (list.items || [])
+    .filter(item => item.done && item.doneAt && (Date.now() - new Date(item.doneAt).getTime()) >= 30000)
+    .sort((a, b) => {
+      const aTime = a.doneAt ? new Date(a.doneAt).getTime() : 0;
+      const bTime = b.doneAt ? new Date(b.doneAt).getTime() : 0;
+      return bTime - aTime;
+    });
+
+  const currentUserEmail = user?.email || user?.id || 'anonymous';
+  const isOwner = list.owner === currentUserEmail;
 
   const handleAddItem = (name: string) => {
-    addItemToList(list.id, name);
+    console.log('Adding item:', name, 'to list:', list.id);
+    addItem(list.id, name);
   };
 
   const handleSendInvite = () => {
@@ -71,7 +81,7 @@ export default function ListDetailScreen() {
   };
 
   const handleRemoveMember = (email: string) => {
-    if (email === currentUser.email) {
+    if (email === currentUserEmail) {
       Alert.alert('Cannot Remove', 'You cannot remove yourself from the list');
       return;
     }
@@ -99,7 +109,7 @@ export default function ListDetailScreen() {
         { 
           text: 'Clear', 
           style: 'destructive',
-          onPress: () => clearHistory(list.id)
+          onPress: () => clearListHistory(list.id)
         }
       ]
     );
@@ -114,6 +124,12 @@ export default function ListDetailScreen() {
       updateItemDescription(list.id, editingItem.id, description);
       setEditingItem(null);
     }
+  };
+
+  const handleAddBackToList = (item: any) => {
+    console.log('Adding item back to list:', item.name);
+    // Toggle the item back to not done
+    toggleItemDone(list.id, item.id);
   };
 
   const openSettings = () => {
@@ -136,7 +152,7 @@ export default function ListDetailScreen() {
           <View style={styles.titleContainer}>
             <Text style={styles.title}>{list.name}</Text>
             <Text style={styles.subtitle}>
-              {activeItems.length} active • {list.members.length} members
+              {activeItems.length} active • {(list.members || []).length} members
             </Text>
           </View>
 
@@ -166,7 +182,7 @@ export default function ListDetailScreen() {
               key={item.id}
               item={item}
               onToggleDone={() => toggleItemDone(list.id, item.id)}
-              onUpdateRepeating={() => updateItemRepeating(list.id, item.id)}
+              onUpdateRepeating={() => setItemRepeat(list.id, item.id)}
               onUpdateDescription={(desc) => updateItemDescription(list.id, item.id, desc)}
               onUpdateName={(name) => updateItemName(list.id, item.id, name)}
               onShowDescription={() => {
@@ -186,7 +202,7 @@ export default function ListDetailScreen() {
                   key={item.id}
                   item={item}
                   onToggleDone={() => toggleItemDone(list.id, item.id)}
-                  onUpdateRepeating={() => updateItemRepeating(list.id, item.id)}
+                  onUpdateRepeating={() => setItemRepeat(list.id, item.id)}
                   onUpdateDescription={(desc) => updateItemDescription(list.id, item.id, desc)}
                   onUpdateName={(name) => updateItemName(list.id, item.id, name)}
                   onShowDescription={() => {
@@ -225,7 +241,7 @@ export default function ListDetailScreen() {
               </View>
               {historyItems.map((item, index) => (
                 <ShoppingItem
-                  key={`${item.id}-${item.completedAt?.getTime()}-${index}`}
+                  key={`${item.id}-${item.doneAt ? new Date(item.doneAt).getTime() : Date.now()}-${index}`}
                   item={item}
                   onToggleDone={() => {}}
                   onUpdateRepeating={() => {}}
@@ -237,7 +253,7 @@ export default function ListDetailScreen() {
                     }
                   }}
                   isHistoryItem={true}
-                  onAddBackToList={() => addHistoryItemBackToList(list.id, item)}
+                  onAddBackToList={() => handleAddBackToList(item)}
                 />
               ))}
             </View>
@@ -255,8 +271,8 @@ export default function ListDetailScreen() {
             <Text style={styles.bottomSheetTitle}>List Settings</Text>
             
             <View style={styles.membersSection}>
-              <Text style={styles.sectionTitle}>Members ({list.members.length})</Text>
-              {list.members.map((email) => (
+              <Text style={styles.sectionTitle}>Members ({(list.members || []).length})</Text>
+              {(list.members || []).map((email) => (
                 <View key={email} style={styles.memberItem}>
                   <View style={styles.memberInfo}>
                     <Icon name="person" size={20} color={colors.text} />
@@ -265,7 +281,7 @@ export default function ListDetailScreen() {
                       <Text style={styles.ownerBadge}>Owner</Text>
                     )}
                   </View>
-                  {isOwner && email !== currentUser.email && (
+                  {isOwner && email !== currentUserEmail && (
                     <TouchableOpacity 
                       onPress={() => handleRemoveMember(email)}
                       accessibilityRole="button"

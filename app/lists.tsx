@@ -5,57 +5,82 @@ import { router, Redirect } from 'expo-router';
 import { useShoppingLists } from '../hooks/useShoppingLists';
 import { commonStyles, colors } from '../styles/commonStyles';
 import ShoppingListCard from '../components/ShoppingListCard';
-import Button from '../components/Button';
 import CreateListModal from '../components/CreateListModal';
+import Button from '../components/Button';
 
 export default function ListsScreen() {
-  const { lists, createList } = useShoppingLists();
+  const { shoppingLists, createList, loading } = useShoppingLists();
   const [showCreateModal, setShowCreateModal] = useState(false);
 
+  // Auto-redirect if only one list
   useEffect(() => {
-    console.log('Lists screen loaded with', lists.length, 'lists');
-  }, [lists]);
-
-  // If there's only one list, redirect to it
-  if (lists.length === 1) {
-    return <Redirect href={`/list/${lists[0].id}`} />;
-  }
+    if (!loading && shoppingLists && shoppingLists.length === 1) {
+      console.log('Auto-redirecting to single list:', shoppingLists[0].id);
+      router.replace(`/list/${shoppingLists[0].id}`);
+    }
+  }, [shoppingLists, loading]);
 
   const handleCreateList = (name: string, members: string[]) => {
-    const listId = createList(name, members);
+    console.log('Creating list:', name, 'with members:', members);
+    createList(name, members);
     setShowCreateModal(false);
-    router.push(`/list/${listId}`);
   };
 
   const handleListPress = (listId: string) => {
+    console.log('Navigating to list:', listId);
     router.push(`/list/${listId}`);
   };
 
-  return (
-    <View style={commonStyles.wrapper}>
-      <View style={styles.header}>
-        <Text style={styles.title}>My Shopping Lists</Text>
-        <Text style={styles.subtitle}>
-          {lists.length} {lists.length === 1 ? 'list' : 'lists'}
-        </Text>
+  if (loading) {
+    return (
+      <View style={commonStyles.container}>
+        <Text style={commonStyles.text}>Loading...</Text>
       </View>
+    );
+  }
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {lists.map((list) => (
-          <ShoppingListCard
-            key={list.id}
-            list={list}
-            onPress={() => handleListPress(list.id)}
-          />
-        ))}
-        
-        <View style={styles.buttonContainer}>
+  if (!shoppingLists || shoppingLists.length === 0) {
+    return (
+      <View style={commonStyles.container}>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyTitle}>No Shopping Lists</Text>
+          <Text style={styles.emptySubtitle}>Create your first shopping list to get started</Text>
           <Button
             text="Create New List"
             onPress={() => setShowCreateModal(true)}
             style={styles.createButton}
           />
         </View>
+        
+        {showCreateModal && (
+          <CreateListModal
+            onCreateList={handleCreateList}
+            onCancel={() => setShowCreateModal(false)}
+          />
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <View style={commonStyles.wrapper}>
+      <View style={styles.header}>
+        <Text style={styles.title}>Shopping Lists</Text>
+        <Button
+          text="New List"
+          onPress={() => setShowCreateModal(true)}
+          style={styles.newListButton}
+        />
+      </View>
+
+      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+        {shoppingLists.map((list) => (
+          <ShoppingListCard
+            key={list.id}
+            list={list}
+            onPress={() => handleListPress(list.id)}
+          />
+        ))}
       </ScrollView>
 
       {showCreateModal && (
@@ -70,29 +95,48 @@ export default function ListsScreen() {
 
 const styles = StyleSheet.create({
   header: {
-    padding: 20,
-    paddingBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    paddingTop: 20,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: colors.text,
-    marginBottom: 4,
   },
-  subtitle: {
-    fontSize: 16,
-    color: colors.text,
-    opacity: 0.7,
+  newListButton: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   scrollView: {
     flex: 1,
   },
-  buttonContainer: {
-    padding: 16,
-    paddingTop: 8,
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 16,
+    color: colors.text,
+    opacity: 0.7,
+    marginBottom: 32,
+    textAlign: 'center',
   },
   createButton: {
     backgroundColor: colors.accent,
-    marginBottom: 20,
+    paddingHorizontal: 32,
+    paddingVertical: 12,
   },
 });

@@ -3,11 +3,10 @@ export interface ShoppingItem {
   id: string;
   name: string;
   description?: string;
-  isDone: boolean;
-  isRepeating: 'none' | 'daily' | 'weekly' | 'monthly';
+  done: boolean;
+  repeating: 'none' | 'daily' | 'weekly' | 'monthly' | null;
   createdAt: Date;
-  completedAt?: Date;
-  addedBy: string;
+  doneAt?: Date;
   order: number;
 }
 
@@ -17,8 +16,6 @@ export interface ShoppingList {
   items: ShoppingItem[];
   members: string[];
   owner: string;
-  createdAt: Date;
-  history: ShoppingItem[];
 }
 
 export interface User {

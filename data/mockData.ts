@@ -10,10 +10,9 @@ export const createMockItem = (name: string, description?: string, order: number
   id: Math.random().toString(36).substr(2, 9),
   name,
   description,
-  isDone: false,
-  isRepeating: 'none',
+  done: false,
+  repeating: 'none',
   createdAt: new Date(),
-  addedBy: mockUser.email,
   order
 });
 
@@ -29,8 +28,6 @@ export const mockShoppingLists: ShoppingList[] = [
     ],
     members: [mockUser.email, 'partner@example.com'],
     owner: mockUser.email,
-    createdAt: new Date(),
-    history: []
   },
   {
     id: '2',
@@ -41,7 +38,5 @@ export const mockShoppingLists: ShoppingList[] = [
     ],
     members: [mockUser.email, 'friend@example.com'],
     owner: mockUser.email,
-    createdAt: new Date(),
-    history: []
   }
 ];

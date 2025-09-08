@@ -32,7 +32,7 @@ export default function ShoppingItem({
   const [editedName, setEditedName] = useState(item.name);
 
   const getRepeatingIcon = () => {
-    switch (item.isRepeating) {
+    switch (item.repeating) {
       case 'daily': return 'D';
       case 'weekly': return 'W';
       case 'monthly': return 'M';
@@ -41,7 +41,7 @@ export default function ShoppingItem({
   };
 
   const getRepeatingColor = () => {
-    return item.isRepeating !== 'none' ? colors.accent : colors.grey;
+    return item.repeating !== 'none' && item.repeating !== null ? colors.accent : colors.grey;
   };
 
   const handleDescriptionPress = () => {
@@ -100,14 +100,19 @@ export default function ShoppingItem({
     }
   };
 
+  // Handle both old and new data structures
+  const isDone = item.done !== undefined ? item.done : (item as any).isDone;
+  const repeating = item.repeating !== undefined ? item.repeating : (item as any).isRepeating;
+  const completedAt = item.doneAt !== undefined ? item.doneAt : (item as any).completedAt;
+
   return (
     <TouchableOpacity 
-      style={[styles.container, item.isDone && styles.doneContainer]}
+      style={[styles.container, isDone && styles.doneContainer]}
       onPress={handleBackgroundPress}
       accessibilityLabel={
         isHistoryItem 
           ? `Add ${item.name} back to list` 
-          : `Mark ${item.name} as ${item.isDone ? 'not done' : 'done'}`
+          : `Mark ${item.name} as ${isDone ? 'not done' : 'done'}`
       }
     >
       {!isHistoryItem && (
@@ -115,12 +120,12 @@ export default function ShoppingItem({
           style={styles.checkButton}
           onPress={onToggleDone}
           accessibilityRole="button"
-          accessibilityLabel={`Mark ${item.name} as ${item.isDone ? 'not done' : 'done'}`}
+          accessibilityLabel={`Mark ${item.name} as ${isDone ? 'not done' : 'done'}`}
         >
           <Icon 
-            name={item.isDone ? "checkmark-circle" : "ellipse-outline"} 
+            name={isDone ? "checkmark-circle" : "ellipse-outline"} 
             size={24} 
-            color={item.isDone ? colors.accent : colors.grey} 
+            color={isDone ? colors.accent : colors.grey} 
           />
         </TouchableOpacity>
       )}
@@ -148,7 +153,7 @@ export default function ShoppingItem({
             style={styles.nameContainer}
             accessibilityLabel={`Edit name: ${item.name}`}
           >
-            <Text style={[styles.name, item.isDone && styles.doneName]}>
+            <Text style={[styles.name, isDone && styles.doneName]}>
               {item.name}
             </Text>
           </TouchableOpacity>
@@ -166,9 +171,9 @@ export default function ShoppingItem({
           </View>
         )}
         
-        {isHistoryItem && item.completedAt && (
+        {isHistoryItem && completedAt && (
           <Text style={styles.completedDate}>
-            Completed: {item.completedAt.toLocaleDateString()} at {item.completedAt.toLocaleTimeString()}
+            Completed: {new Date(completedAt).toLocaleDateString()} at {new Date(completedAt).toLocaleTimeString()}
           </Text>
         )}
       </View>
@@ -192,9 +197,9 @@ export default function ShoppingItem({
             style={styles.actionButton}
             onPress={onUpdateRepeating}
             accessibilityRole="button"
-            accessibilityLabel={`Set ${item.name} to repeat ${item.isRepeating === 'none' ? 'daily' : item.isRepeating === 'daily' ? 'weekly' : item.isRepeating === 'weekly' ? 'monthly' : 'never'}`}
+            accessibilityLabel={`Set ${item.name} to repeat ${repeating === 'none' || repeating === null ? 'daily' : repeating === 'daily' ? 'weekly' : repeating === 'weekly' ? 'monthly' : 'never'}`}
           >
-            {item.isRepeating !== 'none' ? (
+            {repeating !== 'none' && repeating !== null ? (
               <View style={styles.repeatTextContainer}>
                 <Text style={[styles.repeatText, { color: getRepeatingColor() }]}>
                   {getRepeatingIcon()}

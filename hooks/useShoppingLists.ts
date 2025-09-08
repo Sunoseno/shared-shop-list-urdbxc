@@ -17,7 +17,7 @@ export const useShoppingLists = () => {
   // Use Supabase if user is authenticated, otherwise use local state
   const isUsingSupabase = !!user;
   
-  const shoppingLists = isUsingSupabase ? supabaseHook.shoppingLists : localShoppingLists;
+  const shoppingLists = isUsingSupabase ? (supabaseHook.shoppingLists || []) : localShoppingLists;
   const loading = isUsingSupabase ? supabaseHook.loading : false;
 
   // Local implementations for anonymous users
@@ -26,7 +26,7 @@ export const useShoppingLists = () => {
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
-          const maxOrder = Math.max(...list.items.map(item => item.order), 0);
+          const maxOrder = Math.max(...(list.items || []).map(item => item.order || 0), 0);
           const newItem: ShoppingItem = {
             id: uuid.v4() as string,
             name: itemName,
@@ -38,7 +38,7 @@ export const useShoppingLists = () => {
           };
           return {
             ...list,
-            items: [...list.items, newItem],
+            items: [...(list.items || []), newItem],
           };
         }
         return list;
@@ -53,7 +53,7 @@ export const useShoppingLists = () => {
         if (list.id === listId) {
           return {
             ...list,
-            items: list.items.map(item => {
+            items: (list.items || []).map(item => {
               if (item.id === itemId) {
                 const newDoneStatus = !item.done;
                 return {
@@ -77,7 +77,7 @@ export const useShoppingLists = () => {
           if (list.id === listId) {
             return {
               ...list,
-              items: list.items.filter(item => !(item.id === itemId && item.done)),
+              items: (list.items || []).filter(item => !(item.id === itemId && item.done)),
             };
           }
           return list;
@@ -93,7 +93,7 @@ export const useShoppingLists = () => {
         if (list.id === listId) {
           return {
             ...list,
-            items: list.items.map(item =>
+            items: (list.items || []).map(item =>
               item.id === itemId ? { ...item, description } : item
             ),
           };
@@ -110,7 +110,7 @@ export const useShoppingLists = () => {
         if (list.id === listId) {
           return {
             ...list,
-            items: list.items.map(item =>
+            items: (list.items || []).map(item =>
               item.id === itemId ? { ...item, name: newName } : item
             ),
           };
@@ -127,10 +127,10 @@ export const useShoppingLists = () => {
         if (list.id === listId) {
           return {
             ...list,
-            items: list.items.map(item => {
+            items: (list.items || []).map(item => {
               if (item.id === itemId) {
                 const repeatOptions: ('none' | 'daily' | 'weekly' | 'monthly')[] = ['none', 'daily', 'weekly', 'monthly'];
-                const currentIndex = repeatOptions.indexOf(item.repeating);
+                const currentIndex = repeatOptions.indexOf(item.repeating || 'none');
                 const nextIndex = (currentIndex + 1) % repeatOptions.length;
                 return { ...item, repeating: repeatOptions[nextIndex] };
               }
@@ -150,7 +150,7 @@ export const useShoppingLists = () => {
         if (list.id === listId) {
           return {
             ...list,
-            items: list.items.filter(item => item.id !== itemId),
+            items: (list.items || []).filter(item => item.id !== itemId),
           };
         }
         return list;
@@ -185,7 +185,7 @@ export const useShoppingLists = () => {
         if (list.id === listId) {
           return {
             ...list,
-            members: list.members.filter(member => member !== email),
+            members: (list.members || []).filter(member => member !== email),
           };
         }
         return list;
@@ -200,7 +200,7 @@ export const useShoppingLists = () => {
         if (list.id === listId) {
           return {
             ...list,
-            items: list.items.filter(item => !item.done),
+            items: (list.items || []).filter(item => !item.done),
           };
         }
         return list;
@@ -215,7 +215,7 @@ export const useShoppingLists = () => {
         if (list.id === listId) {
           return {
             ...list,
-            items: list.items.map(item =>
+            items: (list.items || []).map(item =>
               item.id === itemId ? { ...item, order: newIndex } : item
             ),
           };
