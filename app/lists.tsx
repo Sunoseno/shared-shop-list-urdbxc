@@ -16,7 +16,7 @@ export default function ListsScreen() {
 
   console.log('ListsScreen: State - loading:', loading, 'lists count:', shoppingLists?.length || 0);
 
-  // Auto-redirect if only one list
+  // Auto-redirect if only one list (but only after loading is complete)
   useEffect(() => {
     if (!loading && shoppingLists && shoppingLists.length === 1) {
       console.log('ListsScreen: Auto-redirecting to single list:', shoppingLists[0].id);
@@ -35,6 +35,7 @@ export default function ListsScreen() {
     router.push(`/list/${listId}`);
   };
 
+  // Show loading only briefly
   if (loading) {
     console.log('ListsScreen: Showing loading state');
     return (
@@ -44,6 +45,7 @@ export default function ListsScreen() {
     );
   }
 
+  // Show empty state if no lists
   if (!shoppingLists || shoppingLists.length === 0) {
     console.log('ListsScreen: Showing empty state');
     return (

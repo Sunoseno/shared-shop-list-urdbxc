@@ -11,7 +11,13 @@ export const useAuth = () => {
   useEffect(() => {
     console.log('useAuth: Initializing auth');
     
-    // Get initial session with timeout
+    // Set a timeout to prevent infinite loading
+    const timeoutId = setTimeout(() => {
+      console.log('useAuth: Auth timeout, setting loading to false');
+      setLoading(false);
+    }, 3000); // 3 second timeout
+
+    // Get initial session
     const initAuth = async () => {
       try {
         console.log('useAuth: Getting initial session');
@@ -27,19 +33,12 @@ export const useAuth = () => {
       } catch (error) {
         console.error('useAuth: Failed to get initial session:', error);
       } finally {
+        clearTimeout(timeoutId);
         setLoading(false);
       }
     };
 
-    // Set a timeout to prevent infinite loading
-    const timeoutId = setTimeout(() => {
-      console.log('useAuth: Auth timeout, setting loading to false');
-      setLoading(false);
-    }, 5000);
-
-    initAuth().then(() => {
-      clearTimeout(timeoutId);
-    });
+    initAuth();
 
     // Listen for auth changes
     const {
@@ -49,6 +48,7 @@ export const useAuth = () => {
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
+      clearTimeout(timeoutId);
     });
 
     return () => {

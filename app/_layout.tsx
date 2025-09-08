@@ -7,7 +7,6 @@ import { Stack, useGlobalSearchParams } from 'expo-router';
 import { commonStyles } from '../styles/commonStyles';
 import { setupErrorLogging } from '../utils/errorLogger';
 import { useAuth } from '../hooks/useAuth';
-import AuthScreen from '../components/AuthScreen';
 import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorBoundary from '../components/ErrorBoundary';
 
@@ -45,6 +44,7 @@ function RootLayout() {
 
   console.log('RootLayout: Auth state - loading:', loading, 'user:', user?.email || 'anonymous');
 
+  // Only show loading for a short time, then proceed regardless
   if (loading) {
     console.log('RootLayout: Showing loading spinner');
     return (

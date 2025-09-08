@@ -15,14 +15,23 @@ export const useShoppingLists = () => {
   
   // Local state for offline/anonymous users
   const [localShoppingLists, setLocalShoppingLists] = useState<ShoppingList[]>(mockShoppingLists);
+  const [initialized, setInitialized] = useState(false);
+
+  // Initialize after auth loading is complete
+  useEffect(() => {
+    if (!authLoading && !initialized) {
+      console.log('useShoppingLists: Initializing with auth complete');
+      setInitialized(true);
+    }
+  }, [authLoading, initialized]);
 
   // Use Supabase if user is authenticated, otherwise use local state
   const isUsingSupabase = !!user;
   
-  console.log('useShoppingLists: Using Supabase:', isUsingSupabase, 'Auth loading:', authLoading);
+  console.log('useShoppingLists: Using Supabase:', isUsingSupabase, 'Auth loading:', authLoading, 'Initialized:', initialized);
   
   const shoppingLists = isUsingSupabase ? (supabaseHook.shoppingLists || []) : localShoppingLists;
-  const loading = isUsingSupabase ? supabaseHook.loading : false;
+  const loading = !initialized || (isUsingSupabase && supabaseHook.loading);
 
   console.log('useShoppingLists: Final state - loading:', loading, 'lists:', shoppingLists?.length || 0);
 
@@ -234,7 +243,7 @@ export const useShoppingLists = () => {
   // Return appropriate functions based on authentication status
   return {
     shoppingLists,
-    loading: authLoading || loading,
+    loading,
     addItem: isUsingSupabase ? supabaseHook.addItem : localAddItem,
     toggleItemDone: isUsingSupabase ? supabaseHook.toggleItemDone : localToggleItemDone,
     updateItemDescription: isUsingSupabase ? supabaseHook.updateItemDescription : localUpdateItemDescription,

@@ -22,6 +22,12 @@ export const useSupabaseShoppingLists = () => {
     try {
       console.log('Fetching shopping lists for user:', user.email);
       
+      // Set timeout to prevent infinite loading
+      const timeoutId = setTimeout(() => {
+        console.log('Supabase fetch timeout, setting loading to false');
+        setLoading(false);
+      }, 10000);
+
       // Get lists where user is a member
       const { data: memberLists, error: memberError } = await supabase
         .from('list_members')
@@ -37,9 +43,12 @@ export const useSupabaseShoppingLists = () => {
         `)
         .eq('email', user.email || user.id);
 
+      clearTimeout(timeoutId);
+
       if (memberError) {
         console.error('Error fetching member lists:', memberError);
-        throw memberError;
+        setLoading(false);
+        return;
       }
 
       console.log('Member lists:', memberLists);
@@ -97,7 +106,8 @@ export const useSupabaseShoppingLists = () => {
       setShoppingLists(listsWithItems);
     } catch (error) {
       console.error('Error fetching shopping lists:', error);
-      Alert.alert('Error', 'Failed to load shopping lists');
+      // Don't show alert for network errors, just log them
+      console.log('Failed to load shopping lists, continuing with empty state');
     } finally {
       setLoading(false);
     }
@@ -508,10 +518,11 @@ export const useSupabaseShoppingLists = () => {
     }
   };
 
-  // Set up real-time subscriptions
+  // Set up real-time subscriptions only if user exists
   useEffect(() => {
     if (!user) {
       console.log('No user, skipping real-time setup');
+      setLoading(false);
       return;
     }
 
