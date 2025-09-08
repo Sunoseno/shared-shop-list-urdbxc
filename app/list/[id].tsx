@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useMemo } from 'react';
-import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Alert, TouchableOpacity, TextInput } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
@@ -10,6 +10,7 @@ import ShoppingItem from '../../components/ShoppingItem';
 import AddItemInput from '../../components/AddItemInput';
 import Button from '../../components/Button';
 import Icon from '../../components/Icon';
+import EditDescriptionModal from '../../components/EditDescriptionModal';
 
 export default function ListDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -20,11 +21,18 @@ export default function ListDetailScreen() {
     toggleItemDone, 
     updateItemRepeating, 
     updateItemDescription,
+    updateItemName,
+    reorderItems,
+    addHistoryItemBackToList,
+    clearHistory,
     inviteMember,
     removeMember
   } = useShoppingLists();
 
   const [showHistory, setShowHistory] = useState(false);
+  const [showInviteInput, setShowInviteInput] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [editingItem, setEditingItem] = useState<{ id: string; name: string; description?: string } | null>(null);
   const bottomSheetRef = useRef<BottomSheet>(null);
   const snapPoints = useMemo(() => ['25%', '50%', '90%'], []);
 
@@ -39,33 +47,27 @@ export default function ListDetailScreen() {
     );
   }
 
-  const activeItems = list.items.filter(item => !item.isDone);
+  const activeItems = list.items
+    .filter(item => !item.isDone)
+    .sort((a, b) => a.order - b.order);
   const completedItems = list.items.filter(item => item.isDone);
+  const historyItems = list.history.sort((a, b) => 
+    (b.completedAt?.getTime() || 0) - (a.completedAt?.getTime() || 0)
+  );
   const isOwner = list.owner === currentUser.email;
 
   const handleAddItem = (name: string) => {
     addItemToList(list.id, name);
   };
 
-  const handleInviteMember = () => {
-    Alert.prompt(
-      'Invite Member',
-      'Enter email address to invite:',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Send Invite', 
-          onPress: (email) => {
-            if (email && email.includes('@')) {
-              inviteMember(list.id, email);
-              Alert.alert('Invitation Sent', `An invitation has been sent to ${email}`);
-            } else {
-              Alert.alert('Invalid Email', 'Please enter a valid email address');
-            }
-          }
-        }
-      ]
-    );
+  const handleSendInvite = () => {
+    if (inviteEmail.trim() && inviteEmail.includes('@')) {
+      inviteMember(list.id, inviteEmail.trim());
+      setInviteEmail('');
+      setShowInviteInput(false);
+    } else {
+      Alert.alert('Invalid Email', 'Please enter a valid email address');
+    }
   };
 
   const handleRemoveMember = (email: string) => {
@@ -86,6 +88,32 @@ export default function ListDetailScreen() {
         }
       ]
     );
+  };
+
+  const handleClearHistory = () => {
+    Alert.alert(
+      'Clear History',
+      'Are you sure you want to clear all history? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Clear', 
+          style: 'destructive',
+          onPress: () => clearHistory(list.id)
+        }
+      ]
+    );
+  };
+
+  const handleEditDescription = (itemId: string, itemName: string, currentDescription?: string) => {
+    setEditingItem({ id: itemId, name: itemName, description: currentDescription });
+  };
+
+  const handleSaveDescription = (description: string) => {
+    if (editingItem) {
+      updateItemDescription(list.id, editingItem.id, description);
+      setEditingItem(null);
+    }
   };
 
   const openSettings = () => {
@@ -140,11 +168,13 @@ export default function ListDetailScreen() {
               onToggleDone={() => toggleItemDone(list.id, item.id)}
               onUpdateRepeating={() => updateItemRepeating(list.id, item.id)}
               onUpdateDescription={(desc) => updateItemDescription(list.id, item.id, desc)}
+              onUpdateName={(name) => updateItemName(list.id, item.id, name)}
               onShowDescription={() => {
                 if (item.description) {
                   Alert.alert('Description', item.description);
                 }
               }}
+              onEditDescription={() => handleEditDescription(item.id, item.name, item.description)}
             />
           ))}
 
@@ -158,20 +188,22 @@ export default function ListDetailScreen() {
                   onToggleDone={() => toggleItemDone(list.id, item.id)}
                   onUpdateRepeating={() => updateItemRepeating(list.id, item.id)}
                   onUpdateDescription={(desc) => updateItemDescription(list.id, item.id, desc)}
+                  onUpdateName={(name) => updateItemName(list.id, item.id, name)}
                   onShowDescription={() => {
                     if (item.description) {
                       Alert.alert('Description', item.description);
                     }
                   }}
+                  onEditDescription={() => handleEditDescription(item.id, item.name, item.description)}
                 />
               ))}
             </View>
           )}
 
-          {list.history.length > 0 && (
+          {historyItems.length > 0 && (
             <View style={styles.buttonContainer}>
               <Button
-                text={`View History (${list.history.length} items)`}
+                text={`${showHistory ? 'Hide' : 'View'} History (${historyItems.length} items)`}
                 onPress={() => setShowHistory(!showHistory)}
                 style={styles.historyButton}
               />
@@ -180,14 +212,33 @@ export default function ListDetailScreen() {
 
           {showHistory && (
             <View style={styles.historySection}>
-              <Text style={styles.historyTitle}>History</Text>
-              {list.history.map((item) => (
-                <View key={`${item.id}-${item.completedAt}`} style={styles.historyItem}>
-                  <Text style={styles.historyItemName}>{item.name}</Text>
-                  <Text style={styles.historyItemDate}>
-                    {item.completedAt?.toLocaleDateString()}
-                  </Text>
-                </View>
+              <View style={styles.historyHeader}>
+                <Text style={styles.historyTitle}>History</Text>
+                <TouchableOpacity
+                  style={styles.clearHistoryButton}
+                  onPress={handleClearHistory}
+                  accessibilityRole="button"
+                  accessibilityLabel="Clear all history"
+                >
+                  <Icon name="trash-outline" size={20} color={colors.error} />
+                </TouchableOpacity>
+              </View>
+              {historyItems.map((item, index) => (
+                <ShoppingItem
+                  key={`${item.id}-${item.completedAt?.getTime()}-${index}`}
+                  item={item}
+                  onToggleDone={() => {}}
+                  onUpdateRepeating={() => {}}
+                  onUpdateDescription={() => {}}
+                  onUpdateName={() => {}}
+                  onShowDescription={() => {
+                    if (item.description) {
+                      Alert.alert('Description', item.description);
+                    }
+                  }}
+                  isHistoryItem={true}
+                  onAddBackToList={() => addHistoryItemBackToList(list.id, item)}
+                />
               ))}
             </View>
           )}
@@ -227,13 +278,53 @@ export default function ListDetailScreen() {
               ))}
             </View>
 
-            <Button
-              text="Invite Member"
-              onPress={handleInviteMember}
-              style={styles.inviteButton}
-            />
+            {showInviteInput ? (
+              <View style={styles.inviteInputContainer}>
+                <TextInput
+                  style={styles.inviteInput}
+                  value={inviteEmail}
+                  onChangeText={setInviteEmail}
+                  placeholder="Enter email address"
+                  placeholderTextColor={colors.grey}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  accessibilityLabel="Invite email input"
+                />
+                <View style={styles.inviteButtons}>
+                  <Button
+                    text="Cancel"
+                    onPress={() => {
+                      setShowInviteInput(false);
+                      setInviteEmail('');
+                    }}
+                    style={styles.cancelInviteButton}
+                    textStyle={styles.cancelInviteButtonText}
+                  />
+                  <Button
+                    text="Send Invite"
+                    onPress={handleSendInvite}
+                    style={styles.sendInviteButton}
+                  />
+                </View>
+              </View>
+            ) : (
+              <Button
+                text="Invite Member"
+                onPress={() => setShowInviteInput(true)}
+                style={styles.inviteButton}
+              />
+            )}
           </BottomSheetView>
         </BottomSheet>
+
+        {editingItem && (
+          <EditDescriptionModal
+            itemName={editingItem.name}
+            currentDescription={editingItem.description}
+            onSave={handleSaveDescription}
+            onCancel={() => setEditingItem(null)}
+          />
+        )}
       </View>
     </GestureHandlerRootView>
   );
@@ -312,31 +403,21 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 20,
   },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
   historyTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: 12,
   },
-  historyItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: colors.backgroundAlt,
+  clearHistoryButton: {
+    padding: 8,
     borderRadius: 6,
-    marginVertical: 2,
-  },
-  historyItemName: {
-    fontSize: 14,
-    color: colors.text,
-    opacity: 0.8,
-  },
-  historyItemDate: {
-    fontSize: 12,
-    color: colors.text,
-    opacity: 0.6,
+    backgroundColor: colors.backgroundAlt,
   },
   bottomSheetBackground: {
     backgroundColor: colors.backgroundAlt,
@@ -390,5 +471,34 @@ const styles = StyleSheet.create({
   },
   inviteButton: {
     backgroundColor: colors.accent,
+  },
+  inviteInputContainer: {
+    marginTop: 10,
+  },
+  inviteInput: {
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: colors.text,
+    borderWidth: 1,
+    borderColor: colors.grey,
+    marginBottom: 12,
+  },
+  inviteButtons: {
+    flexDirection: 'row',
+  },
+  cancelInviteButton: {
+    flex: 1,
+    backgroundColor: colors.background,
+    marginRight: 8,
+  },
+  cancelInviteButtonText: {
+    color: colors.text,
+  },
+  sendInviteButton: {
+    flex: 1,
+    backgroundColor: colors.accent,
+    marginLeft: 8,
   },
 });

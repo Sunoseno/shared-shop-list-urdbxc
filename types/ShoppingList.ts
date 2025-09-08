@@ -8,6 +8,7 @@ export interface ShoppingItem {
   createdAt: Date;
   completedAt?: Date;
   addedBy: string;
+  order: number;
 }
 
 export interface ShoppingList {
@@ -23,4 +24,13 @@ export interface ShoppingList {
 export interface User {
   email: string;
   name: string;
+}
+
+export interface InviteLink {
+  id: string;
+  listId: string;
+  email: string;
+  token: string;
+  createdAt: Date;
+  expiresAt: Date;
 }

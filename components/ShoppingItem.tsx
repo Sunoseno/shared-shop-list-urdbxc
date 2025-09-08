@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Alert, TextInput } from 'react-native';
 import { ShoppingItem as ShoppingItemType } from '../types/ShoppingList';
 import { colors } from '../styles/commonStyles';
 import Icon from './Icon';
@@ -10,7 +10,11 @@ interface ShoppingItemProps {
   onToggleDone: () => void;
   onUpdateRepeating: () => void;
   onUpdateDescription: (description: string) => void;
+  onUpdateName: (name: string) => void;
   onShowDescription: () => void;
+  onEditDescription?: () => void;
+  isHistoryItem?: boolean;
+  onAddBackToList?: () => void;
 }
 
 export default function ShoppingItem({ 
@@ -18,15 +22,20 @@ export default function ShoppingItem({
   onToggleDone, 
   onUpdateRepeating, 
   onUpdateDescription,
-  onShowDescription 
+  onUpdateName,
+  onShowDescription,
+  onEditDescription,
+  isHistoryItem = false,
+  onAddBackToList
 }: ShoppingItemProps) {
-  const [showDescription, setShowDescription] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState(item.name);
 
   const getRepeatingIcon = () => {
     switch (item.isRepeating) {
-      case 'daily': return 'today';
-      case 'weekly': return 'calendar';
-      case 'monthly': return 'calendar-outline';
+      case 'daily': return 'D';
+      case 'weekly': return 'W';
+      case 'monthly': return 'M';
       default: return 'repeat-outline';
     }
   };
@@ -36,8 +45,42 @@ export default function ShoppingItem({
   };
 
   const handleDescriptionPress = () => {
-    if (item.description) {
-      Alert.alert('Description', item.description);
+    // Do nothing when clicking on description text
+    console.log('Description clicked - no action');
+  };
+
+  const handleNamePress = () => {
+    if (!isHistoryItem) {
+      setIsEditingName(true);
+      setEditedName(item.name);
+    }
+  };
+
+  const handleNameSave = () => {
+    if (editedName.trim() && editedName.trim() !== item.name) {
+      onUpdateName(editedName.trim());
+    }
+    setIsEditingName(false);
+  };
+
+  const handleNameCancel = () => {
+    setEditedName(item.name);
+    setIsEditingName(false);
+  };
+
+  const handleBackgroundPress = () => {
+    if (isHistoryItem && onAddBackToList) {
+      onAddBackToList();
+    } else if (!isHistoryItem) {
+      onToggleDone();
+    }
+  };
+
+  const handleDescriptionIconPress = () => {
+    if (onEditDescription) {
+      onEditDescription();
+    } else if (item.description) {
+      onShowDescription();
     } else {
       Alert.prompt(
         'Add Description',
@@ -58,59 +101,116 @@ export default function ShoppingItem({
   };
 
   return (
-    <View style={[styles.container, item.isDone && styles.doneContainer]}>
-      <TouchableOpacity 
-        style={styles.checkButton}
-        onPress={onToggleDone}
-        accessibilityRole="button"
-        accessibilityLabel={`Mark ${item.name} as ${item.isDone ? 'not done' : 'done'}`}
-      >
-        <Icon 
-          name={item.isDone ? "checkmark-circle" : "ellipse-outline"} 
-          size={24} 
-          color={item.isDone ? colors.accent : colors.grey} 
-        />
-      </TouchableOpacity>
+    <TouchableOpacity 
+      style={[styles.container, item.isDone && styles.doneContainer]}
+      onPress={handleBackgroundPress}
+      accessibilityLabel={
+        isHistoryItem 
+          ? `Add ${item.name} back to list` 
+          : `Mark ${item.name} as ${item.isDone ? 'not done' : 'done'}`
+      }
+    >
+      {!isHistoryItem && (
+        <TouchableOpacity 
+          style={styles.checkButton}
+          onPress={onToggleDone}
+          accessibilityRole="button"
+          accessibilityLabel={`Mark ${item.name} as ${item.isDone ? 'not done' : 'done'}`}
+        >
+          <Icon 
+            name={item.isDone ? "checkmark-circle" : "ellipse-outline"} 
+            size={24} 
+            color={item.isDone ? colors.accent : colors.grey} 
+          />
+        </TouchableOpacity>
+      )}
 
       <View style={styles.content}>
-        <Text style={[styles.name, item.isDone && styles.doneName]}>
-          {item.name}
-        </Text>
+        {isEditingName ? (
+          <View style={styles.nameEditContainer}>
+            <TextInput
+              style={styles.nameInput}
+              value={editedName}
+              onChangeText={setEditedName}
+              onBlur={handleNameSave}
+              onSubmitEditing={handleNameSave}
+              autoFocus
+              selectTextOnFocus
+              accessibilityLabel="Edit item name"
+            />
+            <TouchableOpacity onPress={handleNameCancel} style={styles.cancelButton}>
+              <Icon name="close" size={16} color={colors.grey} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity 
+            onPress={handleNamePress}
+            style={styles.nameContainer}
+            accessibilityLabel={`Edit name: ${item.name}`}
+          >
+            <Text style={[styles.name, item.isDone && styles.doneName]}>
+              {item.name}
+            </Text>
+          </TouchableOpacity>
+        )}
+        
         {item.description && (
-          <Text style={styles.description} numberOfLines={1}>
-            {item.description}
+          <View style={styles.descriptionContainer}>
+            <Text 
+              style={styles.description} 
+              numberOfLines={1}
+              onPress={handleDescriptionPress}
+            >
+              {item.description}
+            </Text>
+          </View>
+        )}
+        
+        {isHistoryItem && item.completedAt && (
+          <Text style={styles.completedDate}>
+            Completed: {item.completedAt.toLocaleDateString()} at {item.completedAt.toLocaleTimeString()}
           </Text>
         )}
       </View>
 
-      <View style={styles.actions}>
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={handleDescriptionPress}
-          accessibilityRole="button"
-          accessibilityLabel={`${item.description ? 'View' : 'Add'} description for ${item.name}`}
-        >
-          <Icon 
-            name={item.description ? "document-text" : "document-text-outline"} 
-            size={20} 
-            color={item.description ? colors.accent : colors.grey} 
-          />
-        </TouchableOpacity>
+      {!isHistoryItem && (
+        <View style={styles.actions}>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={handleDescriptionIconPress}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.description ? 'Edit' : 'Add'} description for ${item.name}`}
+          >
+            <Icon 
+              name={item.description ? "document-text" : "document-text-outline"} 
+              size={20} 
+              color={item.description ? colors.accent : colors.grey} 
+            />
+          </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={onUpdateRepeating}
-          accessibilityRole="button"
-          accessibilityLabel={`Set ${item.name} to repeat ${item.isRepeating === 'none' ? 'daily' : item.isRepeating === 'daily' ? 'weekly' : item.isRepeating === 'weekly' ? 'monthly' : 'never'}`}
-        >
-          <Icon 
-            name={getRepeatingIcon()} 
-            size={20} 
-            color={getRepeatingColor()} 
-          />
-        </TouchableOpacity>
-      </View>
-    </View>
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={onUpdateRepeating}
+            accessibilityRole="button"
+            accessibilityLabel={`Set ${item.name} to repeat ${item.isRepeating === 'none' ? 'daily' : item.isRepeating === 'daily' ? 'weekly' : item.isRepeating === 'weekly' ? 'monthly' : 'never'}`}
+          >
+            {item.isRepeating !== 'none' ? (
+              <View style={styles.repeatTextContainer}>
+                <Text style={[styles.repeatText, { color: getRepeatingColor() }]}>
+                  {getRepeatingIcon()}
+                </Text>
+              </View>
+            ) : (
+              <Icon 
+                name="repeat-outline" 
+                size={20} 
+                color={getRepeatingColor()} 
+              />
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
+    </TouchableOpacity>
   );
 }
 
@@ -135,6 +235,10 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   name: {
     fontSize: 16,
     fontWeight: '500',
@@ -144,10 +248,37 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
     opacity: 0.7,
   },
+  nameEditContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  nameInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+    color: colors.text,
+    backgroundColor: colors.background,
+    borderRadius: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: colors.accent,
+  },
+  cancelButton: {
+    marginLeft: 8,
+    padding: 4,
+  },
+  descriptionContainer: {
+    marginTop: 2,
+  },
   description: {
     fontSize: 12,
     color: colors.text,
     opacity: 0.7,
+  },
+  completedDate: {
+    fontSize: 10,
+    color: colors.grey,
     marginTop: 2,
   },
   actions: {
@@ -157,5 +288,15 @@ const styles = StyleSheet.create({
   actionButton: {
     marginLeft: 8,
     padding: 4,
+  },
+  repeatTextContainer: {
+    width: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  repeatText: {
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });

@@ -1,14 +1,16 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { router, Redirect } from 'expo-router';
 import { useShoppingLists } from '../hooks/useShoppingLists';
 import { commonStyles, colors } from '../styles/commonStyles';
 import ShoppingListCard from '../components/ShoppingListCard';
 import Button from '../components/Button';
+import CreateListModal from '../components/CreateListModal';
 
 export default function ListsScreen() {
   const { lists, createList } = useShoppingLists();
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
     console.log('Lists screen loaded with', lists.length, 'lists');
@@ -19,8 +21,9 @@ export default function ListsScreen() {
     return <Redirect href={`/list/${lists[0].id}`} />;
   }
 
-  const handleCreateList = () => {
-    const listId = createList(`Shopping List ${lists.length + 1}`);
+  const handleCreateList = (name: string, members: string[]) => {
+    const listId = createList(name, members);
+    setShowCreateModal(false);
     router.push(`/list/${listId}`);
   };
 
@@ -49,11 +52,18 @@ export default function ListsScreen() {
         <View style={styles.buttonContainer}>
           <Button
             text="Create New List"
-            onPress={handleCreateList}
+            onPress={() => setShowCreateModal(true)}
             style={styles.createButton}
           />
         </View>
       </ScrollView>
+
+      {showCreateModal && (
+        <CreateListModal
+          onCreateList={handleCreateList}
+          onCancel={() => setShowCreateModal(false)}
+        />
+      )}
     </View>
   );
 }

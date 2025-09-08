@@ -6,14 +6,15 @@ export const mockUser = {
   name: 'Current User'
 };
 
-export const createMockItem = (name: string, description?: string): ShoppingItem => ({
+export const createMockItem = (name: string, description?: string, order: number = 0): ShoppingItem => ({
   id: Math.random().toString(36).substr(2, 9),
   name,
   description,
   isDone: false,
   isRepeating: 'none',
   createdAt: new Date(),
-  addedBy: mockUser.email
+  addedBy: mockUser.email,
+  order
 });
 
 export const mockShoppingLists: ShoppingList[] = [
@@ -21,10 +22,10 @@ export const mockShoppingLists: ShoppingList[] = [
     id: '1',
     name: 'Weekly Groceries',
     items: [
-      createMockItem('Milk', '2% organic milk'),
-      createMockItem('Bread', 'Whole wheat bread'),
-      createMockItem('Eggs', 'Free range eggs - dozen'),
-      createMockItem('Apples', 'Gala apples - 2 lbs'),
+      createMockItem('Milk', '2% organic milk', 0),
+      createMockItem('Bread', 'Whole wheat bread', 1),
+      createMockItem('Eggs', 'Free range eggs - dozen', 2),
+      createMockItem('Apples', 'Gala apples - 2 lbs', 3),
     ],
     members: [mockUser.email, 'partner@example.com'],
     owner: mockUser.email,
@@ -35,8 +36,8 @@ export const mockShoppingLists: ShoppingList[] = [
     id: '2',
     name: 'Party Supplies',
     items: [
-      createMockItem('Balloons', 'Blue and white balloons'),
-      createMockItem('Cake', 'Chocolate birthday cake'),
+      createMockItem('Balloons', 'Blue and white balloons', 0),
+      createMockItem('Cake', 'Chocolate birthday cake', 1),
     ],
     members: [mockUser.email, 'friend@example.com'],
     owner: mockUser.email,
