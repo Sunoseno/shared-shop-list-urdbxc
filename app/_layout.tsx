@@ -1,66 +1,73 @@
-import { Stack, useGlobalSearchParams } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+
 import { Platform, SafeAreaView } from 'react-native';
-import { commonStyles } from '../styles/commonStyles';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
+import { Stack, useGlobalSearchParams } from 'expo-router';
+import { commonStyles } from '../styles/commonStyles';
 import { setupErrorLogging } from '../utils/errorLogger';
+import { useAuth } from '../hooks/useAuth';
+import AuthScreen from '../components/AuthScreen';
+import LoadingSpinner from '../components/LoadingSpinner';
 
-const STORAGE_KEY = 'emulated_device';
+const STORAGE_KEY = 'natively_emulate_mobile';
 
-export default function RootLayout() {
-  const actualInsets = useSafeAreaInsets();
-  const { emulate } = useGlobalSearchParams<{ emulate?: string }>();
-  const [storedEmulate, setStoredEmulate] = useState<string | null>(null);
+function RootLayout() {
+  const [emulate, setEmulate] = useState(false);
+  const { user, loading } = useAuth();
+  const insets = useSafeAreaInsets();
+  const globalParams = useGlobalSearchParams();
 
   useEffect(() => {
-    // Set up global error logging
     setupErrorLogging();
-
+    
     if (Platform.OS === 'web') {
-      // If there's a new emulate parameter, store it
-      if (emulate) {
-        localStorage.setItem(STORAGE_KEY, emulate);
-        setStoredEmulate(emulate);
-      } else {
-        // If no emulate parameter, try to get from localStorage
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          setStoredEmulate(stored);
-        }
+      const stored = localStorage.getItem(STORAGE_KEY);
+      setEmulate(stored === 'true');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (globalParams.emulate === 'true') {
+      setEmulate(true);
+      if (Platform.OS === 'web') {
+        localStorage.setItem(STORAGE_KEY, 'true');
+      }
+    } else if (globalParams.emulate === 'false') {
+      setEmulate(false);
+      if (Platform.OS === 'web') {
+        localStorage.setItem(STORAGE_KEY, 'false');
       }
     }
-  }, [emulate]);
+  }, [globalParams.emulate]);
 
-  let insetsToUse = actualInsets;
-
-  if (Platform.OS === 'web') {
-    const simulatedInsets = {
-      ios: { top: 47, bottom: 20, left: 0, right: 0 },
-      android: { top: 40, bottom: 0, left: 0, right: 0 },
-    };
-
-    // Use stored emulate value if available, otherwise use the current emulate parameter
-    const deviceToEmulate = storedEmulate || emulate;
-    insetsToUse = deviceToEmulate ? simulatedInsets[deviceToEmulate as keyof typeof simulatedInsets] || actualInsets : actualInsets;
+  if (loading) {
+    return (
+      <SafeAreaProvider>
+        <SafeAreaView style={[commonStyles.container, { paddingTop: insets.top }]}>
+          <LoadingSpinner message="Loading..." />
+          <StatusBar style="auto" />
+        </SafeAreaView>
+      </SafeAreaProvider>
+    );
   }
+
+  // Show auth screen if no user (but allow anonymous usage)
+  // For now, we'll skip the auth screen and allow anonymous usage by default
+  // Users can still sign in through the app if they want sync features
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={[commonStyles.wrapper, {
-          paddingTop: insetsToUse.top,
-          paddingBottom: insetsToUse.bottom,
-          paddingLeft: insetsToUse.left,
-          paddingRight: insetsToUse.right,
-       }]}>
-        <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            animation: 'default',
-          }}
-        />
+      <SafeAreaView style={[commonStyles.container, { paddingTop: insets.top }]}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="index" />
+          <Stack.Screen name="lists" />
+          <Stack.Screen name="list/[id]" />
+        </Stack>
+        <StatusBar style="auto" />
       </SafeAreaView>
     </SafeAreaProvider>
   );
 }
+
+export default RootLayout;
