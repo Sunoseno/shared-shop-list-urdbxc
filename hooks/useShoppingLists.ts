@@ -1,43 +1,26 @@
 
-import { ShoppingList, ShoppingItem, InviteLink } from '../types/ShoppingList';
+import { ShoppingList, ShoppingItem } from '../types/ShoppingList';
 import { mockShoppingLists, mockUser } from '../data/mockData';
-import { Alert, Linking } from 'react-native';
+import { Alert } from 'react-native';
 import { useState, useEffect } from 'react';
-import { useAuth } from './useAuth';
-import { useSupabaseShoppingLists } from './useSupabaseShoppingLists';
 import uuid from 'react-native-uuid';
 
 export const useShoppingLists = () => {
-  console.log('useShoppingLists: Initializing');
+  console.log('useShoppingLists: Initializing (offline mode)');
   
-  const { user, loading: authLoading } = useAuth();
-  const supabaseHook = useSupabaseShoppingLists();
-  
-  // Local state for offline/anonymous users
+  // Always use local state for now to avoid Supabase issues
   const [localShoppingLists, setLocalShoppingLists] = useState<ShoppingList[]>(mockShoppingLists);
-  const [initialized, setInitialized] = useState(false);
+  const [loading, setLoading] = useState(false); // Start with false
 
-  // Initialize after auth loading is complete
   useEffect(() => {
-    if (!authLoading && !initialized) {
-      console.log('useShoppingLists: Initializing with auth complete');
-      setInitialized(true);
-    }
-  }, [authLoading, initialized]);
+    console.log('useShoppingLists: Setting up with mock data');
+    setLoading(false);
+  }, []);
 
-  // Use Supabase if user is authenticated, otherwise use local state
-  const isUsingSupabase = !!user;
-  
-  console.log('useShoppingLists: Using Supabase:', isUsingSupabase, 'Auth loading:', authLoading, 'Initialized:', initialized);
-  
-  const shoppingLists = isUsingSupabase ? (supabaseHook.shoppingLists || []) : localShoppingLists;
-  const loading = !initialized || (isUsingSupabase && supabaseHook.loading);
+  console.log('useShoppingLists: Current state - loading:', loading, 'lists:', localShoppingLists?.length || 0);
 
-  console.log('useShoppingLists: Final state - loading:', loading, 'lists:', shoppingLists?.length || 0);
-
-  // Local implementations for anonymous users
-  const localAddItem = (listId: string, itemName: string) => {
-    console.log('useShoppingLists: Adding item locally:', itemName, 'to list:', listId);
+  const addItem = (listId: string, itemName: string) => {
+    console.log('useShoppingLists: Adding item:', itemName, 'to list:', listId);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -61,8 +44,8 @@ export const useShoppingLists = () => {
     );
   };
 
-  const localToggleItemDone = (listId: string, itemId: string) => {
-    console.log('useShoppingLists: Toggling item locally:', itemId);
+  const toggleItemDone = (listId: string, itemId: string) => {
+    console.log('useShoppingLists: Toggling item:', itemId);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -101,8 +84,8 @@ export const useShoppingLists = () => {
     }, 30000);
   };
 
-  const localUpdateItemDescription = (listId: string, itemId: string, description: string) => {
-    console.log('useShoppingLists: Updating item description locally:', itemId, description);
+  const updateItemDescription = (listId: string, itemId: string, description: string) => {
+    console.log('useShoppingLists: Updating item description:', itemId, description);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -118,8 +101,8 @@ export const useShoppingLists = () => {
     );
   };
 
-  const localUpdateItemName = (listId: string, itemId: string, newName: string) => {
-    console.log('useShoppingLists: Updating item name locally:', itemId, newName);
+  const updateItemName = (listId: string, itemId: string, newName: string) => {
+    console.log('useShoppingLists: Updating item name:', itemId, newName);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -135,8 +118,8 @@ export const useShoppingLists = () => {
     );
   };
 
-  const localSetItemRepeat = (listId: string, itemId: string) => {
-    console.log('useShoppingLists: Setting item repeat locally:', itemId);
+  const setItemRepeat = (listId: string, itemId: string) => {
+    console.log('useShoppingLists: Setting item repeat:', itemId);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -158,8 +141,8 @@ export const useShoppingLists = () => {
     );
   };
 
-  const localRemoveItem = (listId: string, itemId: string) => {
-    console.log('useShoppingLists: Removing item locally:', itemId);
+  const removeItem = (listId: string, itemId: string) => {
+    console.log('useShoppingLists: Removing item:', itemId);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -173,8 +156,8 @@ export const useShoppingLists = () => {
     );
   };
 
-  const localCreateList = (listName: string, initialMembers: string[] = []) => {
-    console.log('useShoppingLists: Creating list locally:', listName, 'with members:', initialMembers);
+  const createList = (listName: string, initialMembers: string[] = []) => {
+    console.log('useShoppingLists: Creating list:', listName, 'with members:', initialMembers);
     const newList: ShoppingList = {
       id: uuid.v4() as string,
       name: listName,
@@ -185,16 +168,16 @@ export const useShoppingLists = () => {
     setLocalShoppingLists(prevLists => [...prevLists, newList]);
   };
 
-  const localInviteMember = (listId: string, email: string) => {
-    console.log('useShoppingLists: Inviting member locally:', email, 'to list:', listId);
+  const inviteMember = (listId: string, email: string) => {
+    console.log('useShoppingLists: Inviting member:', email, 'to list:', listId);
     Alert.alert(
       'Offline Mode',
-      'Email invitations are not available in offline mode. Please sign in to invite members via email.'
+      'Email invitations are not available in offline mode. The app is currently running without backend connectivity.'
     );
   };
 
-  const localRemoveMember = (listId: string, email: string) => {
-    console.log('useShoppingLists: Removing member locally:', email, 'from list:', listId);
+  const removeMember = (listId: string, email: string) => {
+    console.log('useShoppingLists: Removing member:', email, 'from list:', listId);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -208,8 +191,8 @@ export const useShoppingLists = () => {
     );
   };
 
-  const localClearListHistory = (listId: string) => {
-    console.log('useShoppingLists: Clearing history locally for list:', listId);
+  const clearListHistory = (listId: string) => {
+    console.log('useShoppingLists: Clearing history for list:', listId);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -223,8 +206,8 @@ export const useShoppingLists = () => {
     );
   };
 
-  const localUpdateItemOrder = (listId: string, itemId: string, newIndex: number) => {
-    console.log('useShoppingLists: Updating item order locally:', itemId, 'to index:', newIndex);
+  const updateItemOrder = (listId: string, itemId: string, newIndex: number) => {
+    console.log('useShoppingLists: Updating item order:', itemId, 'to index:', newIndex);
     setLocalShoppingLists(prevLists =>
       prevLists.map(list => {
         if (list.id === listId) {
@@ -240,23 +223,26 @@ export const useShoppingLists = () => {
     );
   };
 
-  // Return appropriate functions based on authentication status
+  const refreshLists = () => {
+    console.log('useShoppingLists: Refresh not needed for local lists');
+  };
+
   return {
-    shoppingLists,
+    shoppingLists: localShoppingLists,
     loading,
-    addItem: isUsingSupabase ? supabaseHook.addItem : localAddItem,
-    toggleItemDone: isUsingSupabase ? supabaseHook.toggleItemDone : localToggleItemDone,
-    updateItemDescription: isUsingSupabase ? supabaseHook.updateItemDescription : localUpdateItemDescription,
-    updateItemName: isUsingSupabase ? supabaseHook.updateItemName : localUpdateItemName,
-    setItemRepeat: isUsingSupabase ? supabaseHook.setItemRepeat : localSetItemRepeat,
-    removeItem: isUsingSupabase ? supabaseHook.removeItem : localRemoveItem,
-    createList: isUsingSupabase ? supabaseHook.createList : localCreateList,
-    inviteMember: isUsingSupabase ? supabaseHook.inviteMember : localInviteMember,
-    removeMember: isUsingSupabase ? supabaseHook.removeMember : localRemoveMember,
-    clearListHistory: isUsingSupabase ? supabaseHook.clearListHistory : localClearListHistory,
-    updateItemOrder: isUsingSupabase ? supabaseHook.updateItemOrder : localUpdateItemOrder,
-    refreshLists: isUsingSupabase ? supabaseHook.refreshLists : () => console.log('Refresh not needed for local lists'),
-    isUsingSupabase,
-    user,
+    addItem,
+    toggleItemDone,
+    updateItemDescription,
+    updateItemName,
+    setItemRepeat,
+    removeItem,
+    createList,
+    inviteMember,
+    removeMember,
+    clearListHistory,
+    updateItemOrder,
+    refreshLists,
+    isUsingSupabase: false,
+    user: null,
   };
 };

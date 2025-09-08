@@ -9,7 +9,7 @@ export const mockUser = {
 export const createMockItem = (name: string, description?: string, order: number = 0): ShoppingItem => ({
   id: Math.random().toString(36).substr(2, 9),
   name,
-  description,
+  description: description || '',
   done: false,
   repeating: 'none',
   createdAt: new Date(),

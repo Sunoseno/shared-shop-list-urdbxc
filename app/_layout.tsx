@@ -6,15 +6,13 @@ import { useEffect, useState } from 'react';
 import { Stack, useGlobalSearchParams } from 'expo-router';
 import { commonStyles } from '../styles/commonStyles';
 import { setupErrorLogging } from '../utils/errorLogger';
-import { useAuth } from '../hooks/useAuth';
-import LoadingSpinner from '../components/LoadingSpinner';
 import ErrorBoundary from '../components/ErrorBoundary';
 
 const STORAGE_KEY = 'natively_emulate_mobile';
 
 function RootLayout() {
   const [emulate, setEmulate] = useState(false);
-  const { user, loading } = useAuth();
+  const [isReady, setIsReady] = useState(false);
   const insets = useSafeAreaInsets();
   const globalParams = useGlobalSearchParams();
 
@@ -26,6 +24,14 @@ function RootLayout() {
       const stored = localStorage.getItem(STORAGE_KEY);
       setEmulate(stored === 'true');
     }
+    
+    // Simple initialization - just set ready after a short delay
+    const timer = setTimeout(() => {
+      console.log('RootLayout: App is ready');
+      setIsReady(true);
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -42,19 +48,9 @@ function RootLayout() {
     }
   }, [globalParams.emulate]);
 
-  console.log('RootLayout: Auth state - loading:', loading, 'user:', user?.email || 'anonymous');
-
-  // Only show loading for a short time, then proceed regardless
-  if (loading) {
-    console.log('RootLayout: Showing loading spinner');
-    return (
-      <SafeAreaProvider>
-        <SafeAreaView style={[commonStyles.container, { paddingTop: insets.top }]}>
-          <LoadingSpinner message="Loading..." />
-          <StatusBar style="auto" />
-        </SafeAreaView>
-      </SafeAreaProvider>
-    );
+  if (!isReady) {
+    console.log('RootLayout: App not ready yet');
+    return null; // Don't show anything while initializing
   }
 
   console.log('RootLayout: Rendering main app');

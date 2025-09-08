@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet } from 'react-native';
-import { router, Redirect } from 'expo-router';
+import { router } from 'expo-router';
 import { useShoppingLists } from '../hooks/useShoppingLists';
 import { commonStyles, colors } from '../styles/commonStyles';
 import ShoppingListCard from '../components/ShoppingListCard';
@@ -40,7 +40,7 @@ export default function ListsScreen() {
     console.log('ListsScreen: Showing loading state');
     return (
       <View style={commonStyles.container}>
-        <Text style={commonStyles.text}>Loading shopping lists...</Text>
+        <Text style={[commonStyles.text, { color: colors.text }]}>Loading shopping lists...</Text>
       </View>
     );
   }
