@@ -11,7 +11,7 @@ export const createMockItem = (name: string, description?: string, order: number
   name,
   description: description || '',
   done: false,
-  repeating: 'none',
+  repeating: null,
   createdAt: new Date(),
   order
 });

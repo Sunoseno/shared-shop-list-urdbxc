@@ -30,7 +30,7 @@ export const useShoppingLists = () => {
             name: itemName,
             description: '',
             done: false,
-            repeating: 'none',
+            repeating: null,
             createdAt: new Date(),
             order: maxOrder + 1,
           };
@@ -127,8 +127,8 @@ export const useShoppingLists = () => {
             ...list,
             items: (list.items || []).map(item => {
               if (item.id === itemId) {
-                const repeatOptions: ('none' | 'daily' | 'weekly' | 'monthly')[] = ['none', 'daily', 'weekly', 'monthly'];
-                const currentIndex = repeatOptions.indexOf(item.repeating || 'none');
+                const repeatOptions: (null | 'daily' | 'weekly' | 'monthly')[] = [null, 'daily', 'weekly', 'monthly'];
+                const currentIndex = repeatOptions.indexOf(item.repeating);
                 const nextIndex = (currentIndex + 1) % repeatOptions.length;
                 return { ...item, repeating: repeatOptions[nextIndex] };
               }

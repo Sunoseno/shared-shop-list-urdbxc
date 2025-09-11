@@ -39,8 +39,8 @@ export default function ListsScreen() {
   if (loading) {
     console.log('ListsScreen: Showing loading state');
     return (
-      <View style={commonStyles.container}>
-        <Text style={[commonStyles.text, { color: colors.text }]}>Loading shopping lists...</Text>
+      <View style={[commonStyles.wrapper, styles.debugContainer]}>
+        <Text style={[commonStyles.text, styles.debugText]}>Loading shopping lists...</Text>
       </View>
     );
   }
@@ -49,7 +49,7 @@ export default function ListsScreen() {
   if (!shoppingLists || shoppingLists.length === 0) {
     console.log('ListsScreen: Showing empty state');
     return (
-      <View style={commonStyles.container}>
+      <View style={[commonStyles.wrapper, styles.debugContainer]}>
         <View style={styles.emptyState}>
           <Text style={styles.emptyTitle}>No Shopping Lists</Text>
           <Text style={styles.emptySubtitle}>Create your first shopping list to get started</Text>
@@ -73,7 +73,7 @@ export default function ListsScreen() {
   console.log('ListsScreen: Showing lists:', shoppingLists.map(l => l.name));
 
   return (
-    <View style={commonStyles.wrapper}>
+    <View style={[commonStyles.wrapper, styles.debugContainer]}>
       <View style={styles.header}>
         <Text style={styles.title}>Shopping Lists</Text>
         <Button
@@ -104,12 +104,23 @@ export default function ListsScreen() {
 }
 
 const styles = StyleSheet.create({
+  debugContainer: {
+    borderWidth: 2,
+    borderColor: 'red',
+    backgroundColor: colors.background,
+  },
+  debugText: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
     paddingTop: 20,
+    backgroundColor: colors.background,
   },
   title: {
     fontSize: 28,
@@ -123,6 +134,7 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   emptyState: {
     flex: 1,

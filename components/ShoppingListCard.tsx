@@ -20,7 +20,7 @@ export default function ShoppingListCard({ list, onPress }: ShoppingListCardProp
 
   return (
     <TouchableOpacity 
-      style={styles.card} 
+      style={[styles.card, styles.debugCard]} 
       onPress={onPress}
       activeOpacity={0.7}
       accessibilityRole="button"
@@ -58,6 +58,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
+  },
+  debugCard: {
+    borderWidth: 2,
+    borderColor: 'blue',
+    minHeight: 80,
   },
   header: {
     flexDirection: 'row',

@@ -1,5 +1,5 @@
 
-import { Platform, SafeAreaView } from 'react-native';
+import { Platform, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
@@ -10,10 +10,26 @@ import ErrorBoundary from '../components/ErrorBoundary';
 
 const STORAGE_KEY = 'natively_emulate_mobile';
 
+function RootLayoutContent() {
+  const insets = useSafeAreaInsets();
+  
+  console.log('RootLayoutContent: Rendering with insets:', insets);
+
+  return (
+    <View style={[commonStyles.wrapper, { paddingTop: insets.top }]}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="lists" />
+        <Stack.Screen name="list/[id]" />
+      </Stack>
+      <StatusBar style="auto" />
+    </View>
+  );
+}
+
 function RootLayout() {
   const [emulate, setEmulate] = useState(false);
   const [isReady, setIsReady] = useState(false);
-  const insets = useSafeAreaInsets();
   const globalParams = useGlobalSearchParams();
 
   useEffect(() => {
@@ -25,13 +41,9 @@ function RootLayout() {
       setEmulate(stored === 'true');
     }
     
-    // Simple initialization - just set ready after a short delay
-    const timer = setTimeout(() => {
-      console.log('RootLayout: App is ready');
-      setIsReady(true);
-    }, 100);
-    
-    return () => clearTimeout(timer);
+    // Simple initialization - just set ready immediately
+    console.log('RootLayout: App is ready');
+    setIsReady(true);
   }, []);
 
   useEffect(() => {
@@ -50,7 +62,7 @@ function RootLayout() {
 
   if (!isReady) {
     console.log('RootLayout: App not ready yet');
-    return null; // Don't show anything while initializing
+    return null;
   }
 
   console.log('RootLayout: Rendering main app');
@@ -58,14 +70,7 @@ function RootLayout() {
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
-        <SafeAreaView style={[commonStyles.container, { paddingTop: insets.top }]}>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="lists" />
-            <Stack.Screen name="list/[id]" />
-          </Stack>
-          <StatusBar style="auto" />
-        </SafeAreaView>
+        <RootLayoutContent />
       </SafeAreaProvider>
     </ErrorBoundary>
   );
