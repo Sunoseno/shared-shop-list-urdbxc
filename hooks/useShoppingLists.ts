@@ -68,20 +68,12 @@ export const useShoppingLists = () => {
       })
     );
 
-    // Auto-remove done items after 30 seconds
+    // Auto-move to history after 10 seconds (changed from 30 seconds)
     setTimeout(() => {
-      setLocalShoppingLists(prevLists =>
-        prevLists.map(list => {
-          if (list.id === listId) {
-            return {
-              ...list,
-              items: (list.items || []).filter(item => !(item.id === itemId && item.done)),
-            };
-          }
-          return list;
-        })
-      );
-    }, 30000);
+      console.log('useShoppingLists: Moving item to history after 10 seconds:', itemId);
+      // The item stays in the list but with done=true and doneAt timestamp
+      // The UI will filter it appropriately based on the time difference
+    }, 10000);
   };
 
   const updateItemDescription = (listId: string, itemId: string, description: string) => {
@@ -158,21 +150,44 @@ export const useShoppingLists = () => {
 
   const createList = (listName: string, initialMembers: string[] = []) => {
     console.log('useShoppingLists: Creating list:', listName, 'with members:', initialMembers);
+    const newListId = uuid.v4() as string;
     const newList: ShoppingList = {
-      id: uuid.v4() as string,
+      id: newListId,
       name: listName,
       items: [],
       members: [mockUser.email, ...initialMembers],
       owner: mockUser.email,
     };
     setLocalShoppingLists(prevLists => [...prevLists, newList]);
+    return newListId; // Return the ID so we can navigate to it
   };
 
   const inviteMember = (listId: string, email: string) => {
     console.log('useShoppingLists: Inviting member:', email, 'to list:', listId);
+    
+    // For now, show a message about enabling Supabase for real invites
     Alert.alert(
-      'Offline Mode',
-      'Email invitations are not available in offline mode. The app is currently running without backend connectivity.'
+      'Email Invitations',
+      'To enable email invitations and real-time collaboration, please enable Supabase by pressing the Supabase button and connecting to your project. For now, members will be added to the list locally.',
+      [
+        { text: 'OK', style: 'default' }
+      ]
+    );
+
+    // Add member locally for demo purposes
+    setLocalShoppingLists(prevLists =>
+      prevLists.map(list => {
+        if (list.id === listId) {
+          const members = list.members || [];
+          if (!members.includes(email)) {
+            return {
+              ...list,
+              members: [...members, email],
+            };
+          }
+        }
+        return list;
+      })
     );
   };
 
@@ -243,6 +258,6 @@ export const useShoppingLists = () => {
     updateItemOrder,
     refreshLists,
     isUsingSupabase: false,
-    user: null,
+    user: mockUser,
   };
 };

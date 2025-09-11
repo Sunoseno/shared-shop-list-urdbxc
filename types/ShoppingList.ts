@@ -4,7 +4,7 @@ export interface ShoppingItem {
   name: string;
   description?: string;
   done: boolean;
-  repeating: 'none' | 'daily' | 'weekly' | 'monthly' | null;
+  repeating: 'daily' | 'weekly' | 'monthly' | null;
   createdAt: Date;
   doneAt?: Date;
   order: number;

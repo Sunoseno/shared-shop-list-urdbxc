@@ -50,21 +50,25 @@ export default function CreateListModal({ onCreateList, onCancel }: CreateListMo
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={styles.content}>
+        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           <View style={styles.section}>
-            <Text style={styles.label}>List Name</Text>
+            <Text style={styles.label}>List Name *</Text>
             <TextInput
               style={styles.input}
               value={listName}
               onChangeText={setListName}
-              placeholder="Enter list name"
+              placeholder="e.g., Weekly Groceries, Party Supplies"
               placeholderTextColor={colors.grey}
               accessibilityLabel="List name input"
+              autoFocus
             />
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.label}>Add Members (Optional)</Text>
+            <Text style={styles.label}>Invite Members (Optional)</Text>
+            <Text style={styles.helperText}>
+              Add email addresses to invite people to collaborate on this list
+            </Text>
             <View style={styles.memberInputContainer}>
               <TextInput
                 style={[styles.input, styles.memberInput]}
@@ -75,6 +79,7 @@ export default function CreateListModal({ onCreateList, onCancel }: CreateListMo
                 keyboardType="email-address"
                 autoCapitalize="none"
                 accessibilityLabel="Member email input"
+                onSubmitEditing={handleAddMember}
               />
               <TouchableOpacity 
                 style={styles.addButton} 
@@ -87,7 +92,7 @@ export default function CreateListModal({ onCreateList, onCancel }: CreateListMo
 
             {members.length > 0 && (
               <View style={styles.membersList}>
-                <Text style={styles.membersTitle}>Members to invite:</Text>
+                <Text style={styles.membersTitle}>Members to invite ({members.length}):</Text>
                 {members.map((email) => (
                   <View key={email} style={styles.memberItem}>
                     <Icon name="person" size={16} color={colors.text} />
@@ -95,8 +100,9 @@ export default function CreateListModal({ onCreateList, onCancel }: CreateListMo
                     <TouchableOpacity 
                       onPress={() => handleRemoveMember(email)}
                       accessibilityLabel={`Remove ${email}`}
+                      style={styles.removeButton}
                     >
-                      <Icon name="close-circle" size={16} color={colors.accent} />
+                      <Icon name="close-circle" size={16} color={colors.error} />
                     </TouchableOpacity>
                   </View>
                 ))}
@@ -115,7 +121,8 @@ export default function CreateListModal({ onCreateList, onCancel }: CreateListMo
           <Button
             text="Create List"
             onPress={handleCreate}
-            style={styles.createButton}
+            style={[styles.createButton, !listName.trim() && styles.disabledButton]}
+            disabled={!listName.trim()}
           />
         </View>
       </View>
@@ -141,6 +148,8 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 400,
     maxHeight: '80%',
+    boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.25)',
+    elevation: 8,
   },
   header: {
     flexDirection: 'row',
@@ -159,16 +168,23 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   content: {
-    padding: 20,
+    maxHeight: 400,
   },
   section: {
-    marginBottom: 20,
+    padding: 20,
+    paddingTop: 16,
   },
   label: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
     marginBottom: 8,
+  },
+  helperText: {
+    fontSize: 14,
+    color: colors.grey,
+    marginBottom: 12,
+    lineHeight: 18,
   },
   input: {
     backgroundColor: colors.background,
@@ -195,7 +211,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   membersList: {
-    marginTop: 12,
+    marginTop: 16,
   },
   membersTitle: {
     fontSize: 14,
@@ -208,7 +224,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: colors.background,
     borderRadius: 6,
-    padding: 8,
+    padding: 10,
     marginVertical: 2,
   },
   memberEmail: {
@@ -216,6 +232,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text,
     marginLeft: 8,
+  },
+  removeButton: {
+    padding: 4,
   },
   footer: {
     flexDirection: 'row',
@@ -235,5 +254,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.accent,
     marginLeft: 8,
+  },
+  disabledButton: {
+    backgroundColor: colors.grey,
+    opacity: 0.6,
   },
 });

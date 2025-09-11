@@ -107,7 +107,11 @@ export default function ShoppingItem({
 
   return (
     <TouchableOpacity 
-      style={[styles.container, isDone && styles.doneContainer]}
+      style={[
+        styles.container, 
+        isDone && styles.doneContainer,
+        isHistoryItem && styles.historyContainer
+      ]}
       onPress={handleBackgroundPress}
       accessibilityLabel={
         isHistoryItem 
@@ -125,7 +129,22 @@ export default function ShoppingItem({
           <Icon 
             name={isDone ? "checkmark-circle" : "ellipse-outline"} 
             size={24} 
-            color={isDone ? colors.accent : colors.grey} 
+            color={isDone ? colors.success : colors.grey} 
+          />
+        </TouchableOpacity>
+      )}
+
+      {isHistoryItem && (
+        <TouchableOpacity 
+          style={styles.addBackButton}
+          onPress={onAddBackToList}
+          accessibilityRole="button"
+          accessibilityLabel={`Add ${item.name} back to list`}
+        >
+          <Icon 
+            name="add-circle-outline" 
+            size={24} 
+            color={colors.accent} 
           />
         </TouchableOpacity>
       )}
@@ -151,7 +170,7 @@ export default function ShoppingItem({
           <TouchableOpacity 
             onPress={handleNamePress}
             style={styles.nameContainer}
-            accessibilityLabel={`Edit name: ${item.name}`}
+            accessibilityLabel={isHistoryItem ? item.name : `Edit name: ${item.name}`}
           >
             <Text style={[styles.name, isDone && styles.doneName]}>
               {item.name}
@@ -234,7 +253,16 @@ const styles = StyleSheet.create({
   doneContainer: {
     opacity: 0.6,
   },
+  historyContainer: {
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.grey,
+    opacity: 0.8,
+  },
   checkButton: {
+    marginRight: 12,
+  },
+  addBackButton: {
     marginRight: 12,
   },
   content: {
@@ -299,9 +327,13 @@ const styles = StyleSheet.create({
     height: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.backgroundAlt,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.accent,
   },
   repeatText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: 'bold',
   },
 });

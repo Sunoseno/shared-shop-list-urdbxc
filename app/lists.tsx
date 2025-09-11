@@ -1,12 +1,12 @@
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { router } from 'expo-router';
 import { useShoppingLists } from '../hooks/useShoppingLists';
 import { commonStyles, colors } from '../styles/commonStyles';
 import ShoppingListCard from '../components/ShoppingListCard';
 import CreateListModal from '../components/CreateListModal';
-import Button from '../components/Button';
+import Icon from '../components/Icon';
 
 export default function ListsScreen() {
   console.log('ListsScreen: Rendering');
@@ -26,8 +26,13 @@ export default function ListsScreen() {
 
   const handleCreateList = (name: string, members: string[]) => {
     console.log('ListsScreen: Creating list:', name, 'with members:', members);
-    createList(name, members);
+    const newListId = createList(name, members);
     setShowCreateModal(false);
+    
+    // Navigate to the new list immediately so user can add items
+    if (newListId) {
+      router.push(`/list/${newListId}`);
+    }
   };
 
   const handleListPress = (listId: string) => {
@@ -39,8 +44,8 @@ export default function ListsScreen() {
   if (loading) {
     console.log('ListsScreen: Showing loading state');
     return (
-      <View style={[commonStyles.wrapper, styles.debugContainer]}>
-        <Text style={[commonStyles.text, styles.debugText]}>Loading shopping lists...</Text>
+      <View style={[commonStyles.wrapper, styles.container]}>
+        <Text style={[commonStyles.text, styles.loadingText]}>Loading shopping lists...</Text>
       </View>
     );
   }
@@ -49,15 +54,20 @@ export default function ListsScreen() {
   if (!shoppingLists || shoppingLists.length === 0) {
     console.log('ListsScreen: Showing empty state');
     return (
-      <View style={[commonStyles.wrapper, styles.debugContainer]}>
+      <View style={[commonStyles.wrapper, styles.container]}>
         <View style={styles.emptyState}>
+          <Icon name="basket-outline" size={64} color={colors.grey} />
           <Text style={styles.emptyTitle}>No Shopping Lists</Text>
           <Text style={styles.emptySubtitle}>Create your first shopping list to get started</Text>
-          <Button
-            text="Create New List"
-            onPress={() => setShowCreateModal(true)}
+          <TouchableOpacity
             style={styles.createButton}
-          />
+            onPress={() => setShowCreateModal(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Create new shopping list"
+          >
+            <Icon name="add" size={24} color={colors.background} />
+            <Text style={styles.createButtonText}>Create New List</Text>
+          </TouchableOpacity>
         </View>
         
         {showCreateModal && (
@@ -73,14 +83,17 @@ export default function ListsScreen() {
   console.log('ListsScreen: Showing lists:', shoppingLists.map(l => l.name));
 
   return (
-    <View style={[commonStyles.wrapper, styles.debugContainer]}>
+    <View style={[commonStyles.wrapper, styles.container]}>
       <View style={styles.header}>
         <Text style={styles.title}>Shopping Lists</Text>
-        <Button
-          text="New List"
-          onPress={() => setShowCreateModal(true)}
+        <TouchableOpacity
           style={styles.newListButton}
-        />
+          onPress={() => setShowCreateModal(true)}
+          accessibilityRole="button"
+          accessibilityLabel="Create new shopping list"
+        >
+          <Icon name="add" size={24} color={colors.background} />
+        </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
@@ -104,15 +117,15 @@ export default function ListsScreen() {
 }
 
 const styles = StyleSheet.create({
-  debugContainer: {
-    borderWidth: 2,
-    borderColor: 'red',
+  container: {
     backgroundColor: colors.background,
   },
-  debugText: {
+  loadingText: {
     color: colors.text,
     fontSize: 18,
     fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 50,
   },
   header: {
     flexDirection: 'row',
@@ -129,8 +142,13 @@ const styles = StyleSheet.create({
   },
   newListButton: {
     backgroundColor: colors.accent,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    borderRadius: 50,
+    width: 48,
+    height: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.15)',
+    elevation: 4,
   },
   scrollView: {
     flex: 1,
@@ -146,6 +164,7 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: colors.text,
+    marginTop: 16,
     marginBottom: 8,
     textAlign: 'center',
   },
@@ -157,8 +176,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   createButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: colors.accent,
-    paddingHorizontal: 32,
+    paddingHorizontal: 24,
     paddingVertical: 12,
+    borderRadius: 25,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.15)',
+    elevation: 4,
+  },
+  createButtonText: {
+    color: colors.background,
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
   },
 });

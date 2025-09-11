@@ -46,16 +46,16 @@ export default function ListDetailScreen() {
     );
   }
 
-  // Filter items safely with null checks
+  // Filter items safely with null checks - changed to 10 seconds
   const activeItems = (list.items || [])
     .filter(item => !item.done)
     .sort((a, b) => (a.order || 0) - (b.order || 0));
   
   const completedItems = (list.items || [])
-    .filter(item => item.done && item.doneAt && (Date.now() - new Date(item.doneAt).getTime()) < 30000);
+    .filter(item => item.done && item.doneAt && (Date.now() - new Date(item.doneAt).getTime()) < 10000);
   
   const historyItems = (list.items || [])
-    .filter(item => item.done && item.doneAt && (Date.now() - new Date(item.doneAt).getTime()) >= 30000)
+    .filter(item => item.done && item.doneAt && (Date.now() - new Date(item.doneAt).getTime()) >= 10000)
     .sort((a, b) => {
       const aTime = a.doneAt ? new Date(a.doneAt).getTime() : 0;
       const bTime = b.doneAt ? new Date(b.doneAt).getTime() : 0;
@@ -166,10 +166,10 @@ export default function ListDetailScreen() {
           </TouchableOpacity>
         </View>
 
-        <AddItemInput onAddItem={handleAddItem} />
+        <AddItemInput onAddItem={handleAddItem} placeholder="Add item to list..." />
 
         <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-          {activeItems.length === 0 && (
+          {activeItems.length === 0 && completedItems.length === 0 && (
             <View style={styles.emptyState}>
               <Icon name="basket-outline" size={48} color={colors.grey} />
               <Text style={styles.emptyText}>No items in your list</Text>
@@ -196,7 +196,7 @@ export default function ListDetailScreen() {
 
           {completedItems.length > 0 && (
             <View style={styles.completedSection}>
-              <Text style={styles.completedTitle}>Recently Completed</Text>
+              <Text style={styles.completedTitle}>Recently Completed (moving to history in 10s)</Text>
               {completedItems.map((item) => (
                 <ShoppingItem
                   key={item.id}
