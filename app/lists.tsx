@@ -1,18 +1,25 @@
 
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { router } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { useShoppingLists } from '../hooks/useShoppingLists';
+import { useAuth } from '../hooks/useAuth';
 import { commonStyles, colors } from '../styles/commonStyles';
 import ShoppingListCard from '../components/ShoppingListCard';
 import CreateListModal from '../components/CreateListModal';
+import Button from '../components/Button';
 import Icon from '../components/Icon';
 
 export default function ListsScreen() {
   console.log('ListsScreen: Rendering');
   
-  const { shoppingLists, createList, loading, isAuthenticated } = useShoppingLists();
+  const { shoppingLists, createList, loading, isAuthenticated, user } = useShoppingLists();
+  const { signOut } = useAuth();
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const bottomSheetRef = useRef<BottomSheet>(null);
+  const snapPoints = useMemo(() => ['25%', '50%'], []);
 
   console.log('ListsScreen: State - loading:', loading, 'lists count:', shoppingLists?.length || 0, 'authenticated:', isAuthenticated);
 
@@ -37,9 +44,11 @@ export default function ListsScreen() {
         router.push(`/list/${newListId}`);
       } else {
         console.error('ListsScreen: Failed to create list - no ID returned');
+        Alert.alert('Error', 'Failed to create list. Please try again.');
       }
     } catch (error) {
       console.error('ListsScreen: Error creating list:', error);
+      Alert.alert('Error', 'Failed to create list. Please try again.');
       setShowCreateModal(false);
     }
   };
@@ -47,6 +56,28 @@ export default function ListsScreen() {
   const handleListPress = (listId: string) => {
     console.log('ListsScreen: Navigating to list:', listId);
     router.push(`/list/${listId}`);
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out? You will lose access to your synced lists.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Sign Out', 
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            router.replace('/');
+          }
+        }
+      ]
+    );
+  };
+
+  const openSettings = () => {
+    bottomSheetRef.current?.expand();
   };
 
   // Show loading only briefly
@@ -66,83 +97,215 @@ export default function ListsScreen() {
   if (!shoppingLists || shoppingLists.length === 0) {
     console.log('ListsScreen: Showing empty state');
     return (
-      <View style={[commonStyles.wrapper, styles.container]}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Shopping Lists</Text>
-          {!isAuthenticated && (
-            <View style={styles.offlineIndicator}>
-              <Icon name="wifi-off" size={16} color={colors.accent} />
-              <Text style={styles.offlineText}>Offline</Text>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <View style={[commonStyles.wrapper, styles.container]}>
+          <View style={styles.header}>
+            <View style={styles.titleContainer}>
+              <Text style={styles.title}>Shopping Lists</Text>
+              {!isAuthenticated && (
+                <View style={styles.offlineIndicator}>
+                  <Icon name="wifi-off" size={16} color={colors.accent} />
+                  <Text style={styles.offlineText}>Offline</Text>
+                </View>
+              )}
             </View>
+            <TouchableOpacity
+              style={styles.settingsButton}
+              onPress={openSettings}
+              accessibilityRole="button"
+              accessibilityLabel="Open settings"
+            >
+              <Icon name="settings" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.emptyState}>
+            <Icon name="basket-outline" size={64} color={colors.grey} />
+            <Text style={styles.emptyTitle}>No Shopping Lists</Text>
+            <Text style={styles.emptySubtitle}>Create your first shopping list to get started</Text>
+            <TouchableOpacity
+              style={styles.createButton}
+              onPress={() => setShowCreateModal(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Create new shopping list"
+            >
+              <Icon name="add" size={24} color={colors.background} />
+              <Text style={styles.createButtonText}>Create New List</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {showCreateModal && (
+            <CreateListModal
+              onCreateList={handleCreateList}
+              onCancel={() => setShowCreateModal(false)}
+            />
           )}
-        </View>
-        
-        <View style={styles.emptyState}>
-          <Icon name="basket-outline" size={64} color={colors.grey} />
-          <Text style={styles.emptyTitle}>No Shopping Lists</Text>
-          <Text style={styles.emptySubtitle}>Create your first shopping list to get started</Text>
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={() => setShowCreateModal(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Create new shopping list"
+
+          <BottomSheet
+            ref={bottomSheetRef}
+            index={-1}
+            snapPoints={snapPoints}
+            enablePanDownToClose={true}
+            backgroundStyle={styles.bottomSheetBackground}
           >
-            <Icon name="add" size={24} color={colors.background} />
-            <Text style={styles.createButtonText}>Create New List</Text>
-          </TouchableOpacity>
+            <BottomSheetView style={styles.bottomSheetContent}>
+              <Text style={styles.bottomSheetTitle}>Settings</Text>
+              
+              {!isAuthenticated && (
+                <View style={styles.offlineNotice}>
+                  <Icon name="wifi-off" size={20} color={colors.accent} />
+                  <Text style={styles.offlineText}>
+                    You're in offline mode. Sign in to enable real-time collaboration and sync across devices.
+                  </Text>
+                </View>
+              )}
+              
+              {/* Account Section */}
+              <View style={styles.accountSection}>
+                <Text style={styles.sectionTitle}>Account</Text>
+                {isAuthenticated ? (
+                  <View>
+                    <View style={styles.accountInfo}>
+                      <Icon name="person-circle" size={20} color={colors.text} />
+                      <Text style={styles.accountEmail}>{user?.email}</Text>
+                    </View>
+                    <Button
+                      text="Sign Out"
+                      onPress={handleLogout}
+                      style={styles.logoutButton}
+                      textStyle={styles.logoutButtonText}
+                    />
+                  </View>
+                ) : (
+                  <View style={styles.signInPrompt}>
+                    <Text style={styles.signInText}>
+                      Sign in to sync your lists across devices and collaborate with others.
+                    </Text>
+                    <Button
+                      text="Sign In"
+                      onPress={() => {
+                        bottomSheetRef.current?.close();
+                        router.push('/');
+                      }}
+                      style={styles.signInButton}
+                    />
+                  </View>
+                )}
+              </View>
+            </BottomSheetView>
+          </BottomSheet>
         </View>
-        
-        {showCreateModal && (
-          <CreateListModal
-            onCreateList={handleCreateList}
-            onCancel={() => setShowCreateModal(false)}
-          />
-        )}
-      </View>
+      </GestureHandlerRootView>
     );
   }
 
   console.log('ListsScreen: Showing lists:', shoppingLists.map(l => l.name));
 
   return (
-    <View style={[commonStyles.wrapper, styles.container]}>
-      <View style={styles.header}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>Shopping Lists</Text>
-          {!isAuthenticated && (
-            <View style={styles.offlineIndicator}>
-              <Icon name="wifi-off" size={16} color={colors.accent} />
-              <Text style={styles.offlineText}>Offline</Text>
-            </View>
-          )}
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={[commonStyles.wrapper, styles.container]}>
+        <View style={styles.header}>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>Shopping Lists</Text>
+            {!isAuthenticated && (
+              <View style={styles.offlineIndicator}>
+                <Icon name="wifi-off" size={16} color={colors.accent} />
+                <Text style={styles.offlineText}>Offline</Text>
+              </View>
+            )}
+          </View>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity
+              style={styles.newListButton}
+              onPress={() => setShowCreateModal(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Create new shopping list"
+            >
+              <Icon name="add" size={24} color={colors.background} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.settingsButton}
+              onPress={openSettings}
+              accessibilityRole="button"
+              accessibilityLabel="Open settings"
+            >
+              <Icon name="settings" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
         </View>
-        <TouchableOpacity
-          style={styles.newListButton}
-          onPress={() => setShowCreateModal(true)}
-          accessibilityRole="button"
-          accessibilityLabel="Create new shopping list"
-        >
-          <Icon name="add" size={24} color={colors.background} />
-        </TouchableOpacity>
-      </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {shoppingLists.map((list) => (
-          <ShoppingListCard
-            key={list.id}
-            list={list}
-            onPress={() => handleListPress(list.id)}
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          {shoppingLists.map((list) => (
+            <ShoppingListCard
+              key={list.id}
+              list={list}
+              onPress={() => handleListPress(list.id)}
+            />
+          ))}
+        </ScrollView>
+
+        {showCreateModal && (
+          <CreateListModal
+            onCreateList={handleCreateList}
+            onCancel={() => setShowCreateModal(false)}
           />
-        ))}
-      </ScrollView>
+        )}
 
-      {showCreateModal && (
-        <CreateListModal
-          onCreateList={handleCreateList}
-          onCancel={() => setShowCreateModal(false)}
-        />
-      )}
-    </View>
+        <BottomSheet
+          ref={bottomSheetRef}
+          index={-1}
+          snapPoints={snapPoints}
+          enablePanDownToClose={true}
+          backgroundStyle={styles.bottomSheetBackground}
+        >
+          <BottomSheetView style={styles.bottomSheetContent}>
+            <Text style={styles.bottomSheetTitle}>Settings</Text>
+            
+            {!isAuthenticated && (
+              <View style={styles.offlineNotice}>
+                <Icon name="wifi-off" size={20} color={colors.accent} />
+                <Text style={styles.offlineNoticeText}>
+                  You're in offline mode. Sign in to enable real-time collaboration and sync across devices.
+                </Text>
+              </View>
+            )}
+            
+            {/* Account Section */}
+            <View style={styles.accountSection}>
+              <Text style={styles.sectionTitle}>Account</Text>
+              {isAuthenticated ? (
+                <View>
+                  <View style={styles.accountInfo}>
+                    <Icon name="person-circle" size={20} color={colors.text} />
+                    <Text style={styles.accountEmail}>{user?.email}</Text>
+                  </View>
+                  <Button
+                    text="Sign Out"
+                    onPress={handleLogout}
+                    style={styles.logoutButton}
+                    textStyle={styles.logoutButtonText}
+                  />
+                </View>
+              ) : (
+                <View style={styles.signInPrompt}>
+                  <Text style={styles.signInText}>
+                    Sign in to sync your lists across devices and collaborate with others.
+                  </Text>
+                  <Button
+                    text="Sign In"
+                    onPress={() => {
+                      bottomSheetRef.current?.close();
+                      router.push('/');
+                    }}
+                    style={styles.signInButton}
+                  />
+                </View>
+              )}
+            </View>
+          </BottomSheetView>
+        </BottomSheet>
+      </View>
+    </GestureHandlerRootView>
   );
 }
 
@@ -173,6 +336,7 @@ const styles = StyleSheet.create({
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
   title: {
     fontSize: 28,
@@ -194,6 +358,10 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontWeight: '500',
   },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   newListButton: {
     backgroundColor: colors.accent,
     borderRadius: 50,
@@ -203,6 +371,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.15)',
     elevation: 4,
+    marginRight: 12,
+  },
+  settingsButton: {
+    padding: 8,
   },
   scrollView: {
     flex: 1,
@@ -244,5 +416,81 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  bottomSheetBackground: {
+    backgroundColor: colors.backgroundAlt,
+  },
+  bottomSheetContent: {
+    flex: 1,
+    padding: 20,
+  },
+  bottomSheetTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  offlineNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  offlineNoticeText: {
+    fontSize: 14,
+    color: colors.text,
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 18,
+  },
+  accountSection: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.background,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: 12,
+  },
+  accountInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  accountEmail: {
+    fontSize: 14,
+    color: colors.text,
+    marginLeft: 8,
+    flex: 1,
+  },
+  logoutButton: {
+    backgroundColor: colors.error,
+  },
+  logoutButtonText: {
+    color: colors.background,
+  },
+  signInPrompt: {
+    padding: 16,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+  },
+  signInText: {
+    fontSize: 14,
+    color: colors.text,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  signInButton: {
+    backgroundColor: colors.accent,
   },
 });

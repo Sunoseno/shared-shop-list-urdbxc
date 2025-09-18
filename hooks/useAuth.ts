@@ -2,24 +2,37 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../config/supabase';
 import { Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const REMEMBER_ME_KEY = 'remember_me_enabled';
 
 export const useAuth = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
+  const [rememberMe, setRememberMe] = useState(false);
 
   useEffect(() => {
     console.log('useAuth: Initializing auth with Supabase');
     
-    // Get initial session
+    // Get initial session and remember me preference
     const getInitialSession = async () => {
       try {
+        // Check remember me preference
+        const rememberMeValue = await AsyncStorage.getItem(REMEMBER_ME_KEY);
+        const shouldRemember = rememberMeValue === 'true';
+        setRememberMe(shouldRemember);
+        console.log('useAuth: Remember me preference:', shouldRemember);
+
         const { data: { session }, error } = await supabase.auth.getSession();
         console.log('useAuth: Initial session check:', { session: session?.user?.email, error });
         
         if (session) {
           setSession(session);
           setUser(session.user);
+        } else if (!shouldRemember) {
+          // If remember me is disabled and no session, clear any stored session
+          await supabase.auth.signOut();
         }
       } catch (error) {
         console.error('useAuth: Error getting initial session:', error);
@@ -65,8 +78,8 @@ export const useAuth = () => {
     }
   };
 
-  const signInWithEmail = async (email: string, password: string) => {
-    console.log('useAuth: Signing in with email:', email);
+  const signInWithEmail = async (email: string, password: string, remember: boolean = false) => {
+    console.log('useAuth: Signing in with email:', email, 'Remember:', remember);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -78,6 +91,11 @@ export const useAuth = () => {
         Alert.alert('Sign In Error', error.message);
         return { user: null, error };
       }
+
+      // Store remember me preference
+      await AsyncStorage.setItem(REMEMBER_ME_KEY, remember.toString());
+      setRememberMe(remember);
+      console.log('useAuth: Remember me preference saved:', remember);
 
       console.log('useAuth: Email sign in successful');
       return { user: data.user, error: null };
@@ -129,6 +147,11 @@ export const useAuth = () => {
         return { error };
       }
 
+      // Clear remember me preference on sign out
+      await AsyncStorage.removeItem(REMEMBER_ME_KEY);
+      setRememberMe(false);
+      console.log('useAuth: Remember me preference cleared');
+
       console.log('useAuth: Sign out successful');
       return { error: null };
     } catch (error) {
@@ -138,13 +161,25 @@ export const useAuth = () => {
     }
   };
 
+  const toggleRememberMe = async (enabled: boolean) => {
+    try {
+      await AsyncStorage.setItem(REMEMBER_ME_KEY, enabled.toString());
+      setRememberMe(enabled);
+      console.log('useAuth: Remember me preference updated:', enabled);
+    } catch (error) {
+      console.error('useAuth: Error updating remember me preference:', error);
+    }
+  };
+
   return {
     session,
     user,
     loading,
+    rememberMe,
     signInAnonymously,
     signInWithEmail,
     signUpWithEmail,
     signOut,
+    toggleRememberMe,
   };
 };

@@ -1,6 +1,6 @@
 
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, Alert } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, StyleSheet, Alert, TouchableOpacity } from 'react-native';
 import { colors, commonStyles } from '../styles/commonStyles';
 import { useAuth } from '../hooks/useAuth';
 import Button from './Button';
@@ -12,8 +12,13 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [isSignUp, setIsSignUp] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMeLocal, setRememberMeLocal] = useState(false);
   
-  const { signInAnonymously, signInWithEmail, signUpWithEmail } = useAuth();
+  const { signInAnonymously, signInWithEmail, signUpWithEmail, rememberMe } = useAuth();
+
+  useEffect(() => {
+    setRememberMeLocal(rememberMe);
+  }, [rememberMe]);
 
   const handleAnonymousSignIn = async () => {
     setIsLoading(true);
@@ -46,7 +51,7 @@ export default function AuthScreen() {
       if (isSignUp) {
         result = await signUpWithEmail(email.trim(), password);
       } else {
-        result = await signInWithEmail(email.trim(), password);
+        result = await signInWithEmail(email.trim(), password, rememberMeLocal);
       }
       
       if (result.error) {
@@ -108,6 +113,23 @@ export default function AuthScreen() {
           autoCorrect={false}
           accessibilityLabel="Password input"
         />
+
+        {!isSignUp && (
+          <TouchableOpacity 
+            style={styles.rememberMeContainer}
+            onPress={() => setRememberMeLocal(!rememberMeLocal)}
+            accessibilityLabel="Remember me checkbox"
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: rememberMeLocal }}
+          >
+            <View style={[styles.checkbox, rememberMeLocal && styles.checkboxChecked]}>
+              {rememberMeLocal && (
+                <Icon name="checkmark" size={16} color={colors.background} />
+              )}
+            </View>
+            <Text style={styles.rememberMeText}>Remember me</Text>
+          </TouchableOpacity>
+        )}
 
         <Button
           text={isSignUp ? 'Create Account' : 'Sign In'}
@@ -194,6 +216,29 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: colors.grey,
+  },
+  rememberMeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: colors.grey,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  rememberMeText: {
+    fontSize: 16,
+    color: colors.text,
   },
   primaryButton: {
     backgroundColor: colors.accent,
