@@ -17,10 +17,10 @@ interface ShoppingItemProps {
   onAddBackToList?: () => void;
 }
 
-export default function ShoppingItem({ 
-  item, 
-  onToggleDone, 
-  onUpdateRepeating, 
+export default function ShoppingItem({
+  item,
+  onToggleDone,
+  onUpdateRepeating,
   onUpdateDescription,
   onUpdateName,
   onShowDescription,
@@ -33,20 +33,28 @@ export default function ShoppingItem({
 
   const getRepeatingIcon = () => {
     switch (item.repeating) {
-      case 'daily': return 'D';
-      case 'weekly': return 'W';
-      case 'monthly': return 'M';
+      case 'daily': return 'calendar';
+      case 'weekly': return 'calendar-outline';
+      case 'monthly': return 'calendar-clear-outline';
       default: return 'repeat-outline';
     }
   };
 
   const getRepeatingColor = () => {
-    return item.repeating !== 'none' && item.repeating !== null ? colors.accent : colors.grey;
+    switch (item.repeating) {
+      case 'daily': return colors.success;
+      case 'weekly': return colors.accent;
+      case 'monthly': return colors.warning;
+      default: return colors.grey;
+    }
   };
 
   const handleDescriptionPress = () => {
-    // Do nothing when clicking on description text
-    console.log('Description clicked - no action');
+    if (item.description && item.description.trim()) {
+      onShowDescription();
+    } else if (onEditDescription && !isHistoryItem) {
+      onEditDescription();
+    }
   };
 
   const handleNamePress = () => {
@@ -77,163 +85,132 @@ export default function ShoppingItem({
   };
 
   const handleDescriptionIconPress = () => {
-    if (onEditDescription) {
+    if (onEditDescription && !isHistoryItem) {
       onEditDescription();
-    } else if (item.description) {
-      onShowDescription();
-    } else {
-      Alert.prompt(
-        'Add Description',
-        'Enter a description for this item:',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { 
-            text: 'Save', 
-            onPress: (text) => {
-              if (text) {
-                onUpdateDescription(text);
-              }
-            }
-          }
-        ]
-      );
     }
   };
 
-  // Handle both old and new data structures
-  const isDone = item.done !== undefined ? item.done : (item as any).isDone;
-  const repeating = item.repeating !== undefined ? item.repeating : (item as any).isRepeating;
-  const completedAt = item.doneAt !== undefined ? item.doneAt : (item as any).completedAt;
+  const formatTimestamp = (date: Date) => {
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    
+    return date.toLocaleDateString();
+  };
 
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[
-        styles.container, 
-        isDone && styles.doneContainer,
+        styles.container,
+        item.done && styles.doneContainer,
         isHistoryItem && styles.historyContainer
       ]}
       onPress={handleBackgroundPress}
+      accessibilityRole="button"
       accessibilityLabel={
         isHistoryItem 
-          ? `Add ${item.name} back to list` 
-          : `Mark ${item.name} as ${isDone ? 'not done' : 'done'}`
+          ? `Add ${item.name} back to list`
+          : `Mark ${item.name} as ${item.done ? 'not done' : 'done'}`
       }
     >
-      {!isHistoryItem && (
-        <TouchableOpacity 
-          style={styles.checkButton}
-          onPress={onToggleDone}
-          accessibilityRole="button"
-          accessibilityLabel={`Mark ${item.name} as ${isDone ? 'not done' : 'done'}`}
+      <View style={styles.leftSection}>
+        <TouchableOpacity
+          style={[styles.checkbox, item.done && styles.checkedBox]}
+          onPress={isHistoryItem ? undefined : onToggleDone}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: item.done }}
+          accessibilityLabel={`Mark ${item.name} as ${item.done ? 'not done' : 'done'}`}
         >
-          <Icon 
-            name={isDone ? "checkmark-circle" : "ellipse-outline"} 
-            size={24} 
-            color={isDone ? colors.success : colors.grey} 
-          />
+          {item.done && (
+            <Icon name="checkmark" size={16} color={colors.background} />
+          )}
         </TouchableOpacity>
-      )}
 
-      {isHistoryItem && (
-        <TouchableOpacity 
-          style={styles.addBackButton}
-          onPress={onAddBackToList}
-          accessibilityRole="button"
-          accessibilityLabel={`Add ${item.name} back to list`}
-        >
-          <Icon 
-            name="add-circle-outline" 
-            size={24} 
-            color={colors.accent} 
-          />
-        </TouchableOpacity>
-      )}
-
-      <View style={styles.content}>
-        {isEditingName ? (
-          <View style={styles.nameEditContainer}>
-            <TextInput
-              style={styles.nameInput}
-              value={editedName}
-              onChangeText={setEditedName}
-              onBlur={handleNameSave}
-              onSubmitEditing={handleNameSave}
-              autoFocus
-              selectTextOnFocus
-              accessibilityLabel="Edit item name"
-            />
-            <TouchableOpacity onPress={handleNameCancel} style={styles.cancelButton}>
-              <Icon name="close" size={16} color={colors.grey} />
+        <View style={styles.contentSection}>
+          {isEditingName ? (
+            <View style={styles.nameEditContainer}>
+              <TextInput
+                style={styles.nameInput}
+                value={editedName}
+                onChangeText={setEditedName}
+                onSubmitEditing={handleNameSave}
+                onBlur={handleNameCancel}
+                autoFocus
+                selectTextOnFocus
+                accessibilityLabel="Edit item name"
+              />
+            </View>
+          ) : (
+            <TouchableOpacity onPress={handleNamePress} style={styles.nameContainer}>
+              <Text style={[styles.itemName, item.done && styles.doneText]}>
+                {item.name}
+              </Text>
             </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity 
-            onPress={handleNamePress}
-            style={styles.nameContainer}
-            accessibilityLabel={isHistoryItem ? item.name : `Edit name: ${item.name}`}
-          >
-            <Text style={[styles.name, isDone && styles.doneName]}>
-              {item.name}
+          )}
+
+          {item.description && item.description.trim() && (
+            <TouchableOpacity onPress={handleDescriptionPress}>
+              <Text style={[styles.description, item.done && styles.doneText]} numberOfLines={2}>
+                {item.description}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {isHistoryItem && item.doneAt && (
+            <Text style={styles.timestamp}>
+              Completed {formatTimestamp(item.doneAt)}
             </Text>
-          </TouchableOpacity>
-        )}
-        
-        {item.description && (
-          <View style={styles.descriptionContainer}>
-            <Text 
-              style={styles.description} 
-              numberOfLines={1}
-              onPress={handleDescriptionPress}
-            >
-              {item.description}
-            </Text>
-          </View>
-        )}
-        
-        {isHistoryItem && completedAt && (
-          <Text style={styles.completedDate}>
-            Completed: {new Date(completedAt).toLocaleDateString()} at {new Date(completedAt).toLocaleTimeString()}
-          </Text>
-        )}
+          )}
+        </View>
       </View>
 
-      {!isHistoryItem && (
-        <View style={styles.actions}>
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={handleDescriptionIconPress}
+      <View style={styles.rightSection}>
+        {isHistoryItem ? (
+          <TouchableOpacity
+            style={styles.addBackButton}
+            onPress={onAddBackToList}
             accessibilityRole="button"
-            accessibilityLabel={`${item.description ? 'Edit' : 'Add'} description for ${item.name}`}
+            accessibilityLabel={`Add ${item.name} back to shopping list`}
           >
-            <Icon 
-              name={item.description ? "document-text" : "document-text-outline"} 
-              size={20} 
-              color={item.description ? colors.accent : colors.grey} 
-            />
+            <Icon name="add-circle-outline" size={24} color={colors.accent} />
           </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={onUpdateRepeating}
-            accessibilityRole="button"
-            accessibilityLabel={`Set ${item.name} to repeat ${repeating === 'none' || repeating === null ? 'daily' : repeating === 'daily' ? 'weekly' : repeating === 'weekly' ? 'monthly' : 'never'}`}
-          >
-            {repeating !== 'none' && repeating !== null ? (
-              <View style={styles.repeatTextContainer}>
-                <Text style={[styles.repeatText, { color: getRepeatingColor() }]}>
-                  {getRepeatingIcon()}
-                </Text>
-              </View>
-            ) : (
+        ) : (
+          <>
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={handleDescriptionIconPress}
+              accessibilityRole="button"
+              accessibilityLabel={`${item.description ? 'Edit' : 'Add'} description for ${item.name}`}
+            >
               <Icon 
-                name="repeat-outline" 
+                name={item.description ? "document-text" : "document-text-outline"} 
+                size={20} 
+                color={item.description ? colors.accent : colors.grey} 
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.iconButton}
+              onPress={onUpdateRepeating}
+              accessibilityRole="button"
+              accessibilityLabel={`Set repeat schedule for ${item.name}. Currently ${item.repeating || 'not repeating'}`}
+            >
+              <Icon 
+                name={getRepeatingIcon()} 
                 size={20} 
                 color={getRepeatingColor()} 
               />
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
     </TouchableOpacity>
   );
 }
@@ -242,98 +219,96 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.backgroundAlt,
-    borderRadius: 8,
-    padding: 12,
-    marginVertical: 4,
+    padding: 16,
     marginHorizontal: 16,
+    marginVertical: 4,
+    backgroundColor: colors.background,
+    borderRadius: 12,
     boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.1)',
     elevation: 2,
   },
   doneContainer: {
-    opacity: 0.6,
+    opacity: 0.7,
   },
   historyContainer: {
-    backgroundColor: colors.background,
-    borderWidth: 1,
+    backgroundColor: colors.backgroundAlt,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.accent,
+  },
+  leftSection: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
     borderColor: colors.grey,
-    opacity: 0.8,
-  },
-  checkButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 12,
+    marginTop: 2,
   },
-  addBackButton: {
-    marginRight: 12,
+  checkedBox: {
+    backgroundColor: colors.success,
+    borderColor: colors.success,
   },
-  content: {
+  contentSection: {
     flex: 1,
   },
   nameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginBottom: 4,
   },
-  name: {
+  itemName: {
     fontSize: 16,
     fontWeight: '500',
     color: colors.text,
+    lineHeight: 20,
   },
-  doneName: {
+  doneText: {
     textDecorationLine: 'line-through',
-    opacity: 0.7,
+    opacity: 0.6,
   },
   nameEditContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginBottom: 4,
   },
   nameInput: {
-    flex: 1,
     fontSize: 16,
     fontWeight: '500',
     color: colors.text,
-    backgroundColor: colors.background,
-    borderRadius: 4,
+    backgroundColor: colors.backgroundAlt,
+    borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderWidth: 1,
     borderColor: colors.accent,
   },
-  cancelButton: {
-    marginLeft: 8,
-    padding: 4,
-  },
-  descriptionContainer: {
+  description: {
+    fontSize: 14,
+    color: colors.text,
+    opacity: 0.8,
+    lineHeight: 18,
     marginTop: 2,
   },
-  description: {
+  timestamp: {
     fontSize: 12,
     color: colors.text,
-    opacity: 0.7,
+    opacity: 0.6,
+    marginTop: 4,
+    fontStyle: 'italic',
   },
-  completedDate: {
-    fontSize: 10,
-    color: colors.grey,
-    marginTop: 2,
-  },
-  actions: {
+  rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  actionButton: {
     marginLeft: 8,
-    padding: 4,
   },
-  repeatTextContainer: {
-    width: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.backgroundAlt,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.accent,
+  iconButton: {
+    padding: 8,
+    marginLeft: 4,
   },
-  repeatText: {
-    fontSize: 12,
-    fontWeight: 'bold',
+  addBackButton: {
+    padding: 8,
   },
 });

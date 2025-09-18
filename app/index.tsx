@@ -1,39 +1,32 @@
 
-import React, { useEffect } from 'react';
-import { View, Text } from 'react-native';
+import React from 'react';
+import { View } from 'react-native';
 import { Redirect } from 'expo-router';
-import { colors } from '../styles/commonStyles';
+import { useAuth } from '../hooks/useAuth';
+import { commonStyles } from '../styles/commonStyles';
+import AuthScreen from '../components/AuthScreen';
+import LoadingSpinner from '../components/LoadingSpinner';
 
-export default function MainScreen() {
-  useEffect(() => {
-    console.log('Main screen loaded, redirecting to lists');
-  }, []);
+export default function IndexScreen() {
+  const { user, loading, session } = useAuth();
 
-  // Show a temporary test screen first
-  return (
-    <View style={{ 
-      flex: 1, 
-      backgroundColor: colors.background, 
-      justifyContent: 'center', 
-      alignItems: 'center',
-      padding: 20
-    }}>
-      <Text style={{ 
-        fontSize: 24, 
-        color: colors.text, 
-        textAlign: 'center',
-        marginBottom: 20
-      }}>
-        Shopping List App
-      </Text>
-      <Text style={{ 
-        fontSize: 16, 
-        color: colors.text, 
-        textAlign: 'center'
-      }}>
-        Loading...
-      </Text>
-      <Redirect href="/lists" />
-    </View>
-  );
+  console.log('IndexScreen: Auth state - loading:', loading, 'user:', user?.email, 'session:', !!session);
+
+  if (loading) {
+    return (
+      <View style={[commonStyles.wrapper, { justifyContent: 'center', alignItems: 'center' }]}>
+        <LoadingSpinner />
+      </View>
+    );
+  }
+
+  // If user is authenticated or chose anonymous mode, redirect to lists
+  if (user || session) {
+    console.log('IndexScreen: Redirecting to lists - authenticated user');
+    return <Redirect href="/lists" />;
+  }
+
+  // Show auth screen for new users
+  console.log('IndexScreen: Showing auth screen');
+  return <AuthScreen />;
 }

@@ -5,43 +5,65 @@ import { ShoppingList, ShoppingItem } from '../types/ShoppingList';
 import { Alert } from 'react-native';
 import uuid from 'react-native-uuid';
 import { mockShoppingLists, mockUser } from '../data/mockData';
+import { useAuth } from './useAuth';
+
+interface HistoryItem {
+  id: string;
+  list_id: string;
+  original_item_id: string;
+  name: string;
+  description: string;
+  completed_at: string;
+  repeating: string;
+}
 
 export const useShoppingLists = () => {
   const [shoppingLists, setShoppingLists] = useState<ShoppingList[]>([]);
+  const [historyItems, setHistoryItems] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
-  const [isUsingSupabase, setIsUsingSupabase] = useState(false);
+  const [completedItemTimeouts, setCompletedItemTimeouts] = useState<Map<string, NodeJS.Timeout>>(new Map());
+  
+  const { user, session } = useAuth();
+  const isAuthenticated = !!session;
 
-  // Check if user is authenticated
-  const checkAuth = useCallback(async () => {
+  // Fetch history items from Supabase
+  const fetchHistoryItems = useCallback(async () => {
+    if (!user?.email) return [];
+
     try {
-      const { data: { user }, error } = await supabase.auth.getUser();
-      console.log('Auth check result:', { user: user?.email, error });
-      
-      if (user) {
-        setUser(user);
-        setIsUsingSupabase(true);
-        return user;
-      } else {
-        // Use anonymous user for now
-        setUser(mockUser);
-        setIsUsingSupabase(false);
-        return mockUser;
+      const { data: memberLists } = await supabase
+        .from('list_members')
+        .select('list_id')
+        .eq('email', user.email);
+
+      if (!memberLists || memberLists.length === 0) return [];
+
+      const listIds = memberLists.map(ml => ml.list_id);
+
+      const { data: history, error } = await supabase
+        .from('history_items')
+        .select('*')
+        .in('list_id', listIds)
+        .order('completed_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching history:', error);
+        return [];
       }
+
+      return history || [];
     } catch (error) {
-      console.log('Auth check failed, using mock user:', error);
-      setUser(mockUser);
-      setIsUsingSupabase(false);
-      return mockUser;
+      console.error('Error fetching history items:', error);
+      return [];
     }
-  }, []);
+  }, [user?.email]);
 
   // Fetch shopping lists from Supabase
-  const fetchSupabaseLists = useCallback(async (currentUser: any) => {
-    if (!currentUser) return [];
+  const fetchSupabaseLists = useCallback(async () => {
+    if (!user?.email) return [];
 
     try {
-      console.log('Fetching lists from Supabase for user:', currentUser.email);
+      console.log('Fetching lists from Supabase for user:', user.email);
       
       // Get lists where user is a member
       const { data: memberLists, error: memberError } = await supabase
@@ -56,7 +78,7 @@ export const useShoppingLists = () => {
             updated_at
           )
         `)
-        .eq('email', currentUser.email || currentUser.id);
+        .eq('email', user.email);
 
       if (memberError) {
         console.error('Error fetching member lists:', memberError);
@@ -94,6 +116,17 @@ export const useShoppingLists = () => {
           continue;
         }
 
+        // Get history items for this list
+        const { data: history, error: historyError } = await supabase
+          .from('history_items')
+          .select('*')
+          .eq('list_id', listData.id)
+          .order('completed_at', { ascending: false });
+
+        if (historyError) {
+          console.error('Error fetching history:', historyError);
+        }
+
         const shoppingItems: ShoppingItem[] = (items || []).map(item => ({
           id: item.id,
           name: item.name,
@@ -105,10 +138,22 @@ export const useShoppingLists = () => {
           order: item.order_index,
         }));
 
+        // Add history items as completed shopping items
+        const historyAsItems: ShoppingItem[] = (history || []).map(histItem => ({
+          id: `history-${histItem.id}`,
+          name: histItem.name,
+          description: histItem.description || '',
+          done: true,
+          repeating: histItem.repeating === 'none' ? null : histItem.repeating,
+          createdAt: new Date(histItem.completed_at),
+          doneAt: new Date(histItem.completed_at),
+          order: 0,
+        }));
+
         listsWithItems.push({
           id: listData.id,
           name: listData.name,
-          items: shoppingItems,
+          items: [...shoppingItems, ...historyAsItems],
           members: (members || []).map(m => m.email),
           owner: listData.owner,
         });
@@ -120,7 +165,7 @@ export const useShoppingLists = () => {
       console.error('Error fetching Supabase lists:', error);
       return [];
     }
-  }, []);
+  }, [user?.email]);
 
   // Main fetch function
   const fetchShoppingLists = useCallback(async () => {
@@ -128,29 +173,31 @@ export const useShoppingLists = () => {
     setLoading(true);
 
     try {
-      const currentUser = await checkAuth();
-      
-      if (isUsingSupabase && currentUser && currentUser.email !== mockUser.email) {
-        const supabaseLists = await fetchSupabaseLists(currentUser);
+      if (isAuthenticated && user?.email) {
+        const supabaseLists = await fetchSupabaseLists();
+        const history = await fetchHistoryItems();
         setShoppingLists(supabaseLists);
+        setHistoryItems(history);
       } else {
-        // Use mock data
-        console.log('Using mock data');
+        // Use mock data for unauthenticated users
+        console.log('Using mock data - user not authenticated');
         setShoppingLists(mockShoppingLists);
+        setHistoryItems([]);
       }
     } catch (error) {
       console.error('Error in fetchShoppingLists:', error);
       setShoppingLists(mockShoppingLists);
+      setHistoryItems([]);
     } finally {
       setLoading(false);
     }
-  }, [checkAuth, fetchSupabaseLists, isUsingSupabase]);
+  }, [isAuthenticated, user?.email, fetchSupabaseLists, fetchHistoryItems]);
 
   // Create new list
   const createList = useCallback(async (listName: string, initialMembers: string[] = []) => {
     console.log('Creating list:', listName, 'with members:', initialMembers);
     
-    if (isUsingSupabase && user && user.email !== mockUser.email) {
+    if (isAuthenticated && user?.email) {
       try {
         const listId = uuid.v4() as string;
         const userEmail = user.email;
@@ -199,27 +246,27 @@ export const useShoppingLists = () => {
         return null;
       }
     } else {
-      // Local creation
+      // Local creation for unauthenticated users
       const newListId = uuid.v4() as string;
       const newList: ShoppingList = {
         id: newListId,
         name: listName,
         items: [],
-        members: [user?.email || mockUser.email, ...initialMembers],
-        owner: user?.email || mockUser.email,
+        members: [mockUser.email, ...initialMembers],
+        owner: mockUser.email,
       };
       
       setShoppingLists(prevLists => [...prevLists, newList]);
       console.log('List created locally with ID:', newListId);
       return newListId;
     }
-  }, [isUsingSupabase, user, fetchShoppingLists]);
+  }, [isAuthenticated, user?.email, fetchShoppingLists]);
 
   // Add item to list
   const addItem = useCallback(async (listId: string, itemName: string) => {
     console.log('Adding item:', itemName, 'to list:', listId);
     
-    if (isUsingSupabase && user && user.email !== mockUser.email) {
+    if (isAuthenticated && user?.email) {
       try {
         // Get current max order
         const { data: maxOrderData } = await supabase
@@ -277,18 +324,48 @@ export const useShoppingLists = () => {
         })
       );
     }
-  }, [isUsingSupabase, user, fetchShoppingLists]);
+  }, [isAuthenticated, user?.email, fetchShoppingLists]);
 
-  // Toggle item done status with proper history handling
+  // Move completed items to history (called after 10 seconds)
+  const moveItemToHistory = useCallback(async (listId: string, itemId: string) => {
+    console.log('Moving item to history:', itemId);
+    
+    if (isAuthenticated && user?.email) {
+      try {
+        // Call the database function to move items to history
+        const { error } = await supabase.rpc('move_completed_items_to_history');
+        
+        if (error) {
+          console.error('Error moving items to history:', error);
+        } else {
+          console.log('Items moved to history successfully');
+          await fetchShoppingLists();
+        }
+      } catch (error) {
+        console.error('Error in moveItemToHistory:', error);
+      }
+    } else {
+      // For local storage, we handle this in the UI filtering
+      console.log('Local mode: Item will be filtered as history in UI');
+    }
+  }, [isAuthenticated, user?.email, fetchShoppingLists]);
+
+  // Toggle item done status with proper 10-second history handling
   const toggleItemDone = useCallback(async (listId: string, itemId: string) => {
     console.log('Toggling item done:', itemId);
     
-    if (isUsingSupabase && user && user.email !== mockUser.email) {
+    // Skip if this is a history item
+    if (itemId.startsWith('history-')) {
+      console.log('Cannot toggle history item');
+      return;
+    }
+    
+    if (isAuthenticated && user?.email) {
       try {
         // Get current item
         const { data: currentItem } = await supabase
           .from('shopping_items')
-          .select('done')
+          .select('done, done_at')
           .eq('id', itemId)
           .single();
 
@@ -316,6 +393,43 @@ export const useShoppingLists = () => {
 
         console.log('Item toggled successfully');
         await fetchShoppingLists();
+
+        // Handle 10-second timeout for moving to history
+        if (newDoneStatus) {
+          // Clear any existing timeout for this item
+          const existingTimeout = completedItemTimeouts.get(itemId);
+          if (existingTimeout) {
+            clearTimeout(existingTimeout);
+          }
+
+          // Set new timeout to move to history after 10 seconds
+          const timeout = setTimeout(async () => {
+            console.log('Moving item to history after 10 seconds:', itemId);
+            await moveItemToHistory(listId, itemId);
+            setCompletedItemTimeouts(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(itemId);
+              return newMap;
+            });
+          }, 10000);
+
+          setCompletedItemTimeouts(prev => {
+            const newMap = new Map(prev);
+            newMap.set(itemId, timeout);
+            return newMap;
+          });
+        } else {
+          // Item was unmarked, clear timeout
+          const existingTimeout = completedItemTimeouts.get(itemId);
+          if (existingTimeout) {
+            clearTimeout(existingTimeout);
+            setCompletedItemTimeouts(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(itemId);
+              return newMap;
+            });
+          }
+        }
       } catch (error) {
         console.error('Error toggling item:', error);
         Alert.alert('Error', 'Failed to update item');
@@ -330,6 +444,43 @@ export const useShoppingLists = () => {
               items: (list.items || []).map(item => {
                 if (item.id === itemId) {
                   const newDoneStatus = !item.done;
+                  
+                  // Handle timeouts for local storage
+                  if (newDoneStatus) {
+                    // Clear any existing timeout
+                    const existingTimeout = completedItemTimeouts.get(itemId);
+                    if (existingTimeout) {
+                      clearTimeout(existingTimeout);
+                    }
+
+                    // Set new timeout
+                    const timeout = setTimeout(() => {
+                      console.log('Moving local item to history after 10 seconds:', itemId);
+                      setCompletedItemTimeouts(prev => {
+                        const newMap = new Map(prev);
+                        newMap.delete(itemId);
+                        return newMap;
+                      });
+                    }, 10000);
+
+                    setCompletedItemTimeouts(prev => {
+                      const newMap = new Map(prev);
+                      newMap.set(itemId, timeout);
+                      return newMap;
+                    });
+                  } else {
+                    // Clear timeout if unmarked
+                    const existingTimeout = completedItemTimeouts.get(itemId);
+                    if (existingTimeout) {
+                      clearTimeout(existingTimeout);
+                      setCompletedItemTimeouts(prev => {
+                        const newMap = new Map(prev);
+                        newMap.delete(itemId);
+                        return newMap;
+                      });
+                    }
+                  }
+
                   return {
                     ...item,
                     done: newDoneStatus,
@@ -344,13 +495,84 @@ export const useShoppingLists = () => {
         })
       );
     }
-  }, [isUsingSupabase, user, fetchShoppingLists]);
+  }, [isAuthenticated, user?.email, fetchShoppingLists, completedItemTimeouts, moveItemToHistory]);
+
+  // Add item back from history (creates a copy)
+  const addItemBackFromHistory = useCallback(async (listId: string, historyItem: ShoppingItem) => {
+    console.log('Adding item back from history:', historyItem.name);
+    
+    if (isAuthenticated && user?.email) {
+      try {
+        // Get current max order
+        const { data: maxOrderData } = await supabase
+          .from('shopping_items')
+          .select('order_index')
+          .eq('list_id', listId)
+          .order('order_index', { ascending: false })
+          .limit(1);
+
+        const maxOrder = maxOrderData?.[0]?.order_index || 0;
+
+        // Create new item (copy from history)
+        const { error } = await supabase
+          .from('shopping_items')
+          .insert({
+            list_id: listId,
+            name: historyItem.name,
+            description: historyItem.description || '',
+            done: false,
+            repeating: historyItem.repeating || 'none',
+            order_index: maxOrder + 1,
+          });
+
+        if (error) {
+          console.error('Error adding item back from history:', error);
+          throw error;
+        }
+
+        console.log('Item added back from history successfully');
+        await fetchShoppingLists();
+      } catch (error) {
+        console.error('Error adding item back from history:', error);
+        Alert.alert('Error', 'Failed to add item back to list');
+      }
+    } else {
+      // Local addition
+      setShoppingLists(prevLists =>
+        prevLists.map(list => {
+          if (list.id === listId) {
+            const maxOrder = Math.max(...(list.items || []).map(item => item.order || 0), 0);
+            const newItem: ShoppingItem = {
+              id: uuid.v4() as string,
+              name: historyItem.name,
+              description: historyItem.description || '',
+              done: false,
+              repeating: historyItem.repeating,
+              createdAt: new Date(),
+              order: maxOrder + 1,
+            };
+            return {
+              ...list,
+              items: [...(list.items || []), newItem],
+            };
+          }
+          return list;
+        })
+      );
+    }
+  }, [isAuthenticated, user?.email, fetchShoppingLists]);
 
   // Update item description
   const updateItemDescription = useCallback(async (listId: string, itemId: string, description: string) => {
     console.log('Updating item description:', itemId, description);
     
-    if (isUsingSupabase && user && user.email !== mockUser.email) {
+    // Skip if this is a history item
+    if (itemId.startsWith('history-')) {
+      console.log('Cannot update history item');
+      return;
+    }
+    
+    if (isAuthenticated && user?.email) {
       try {
         const { error } = await supabase
           .from('shopping_items')
@@ -387,13 +609,19 @@ export const useShoppingLists = () => {
         })
       );
     }
-  }, [isUsingSupabase, user, fetchShoppingLists]);
+  }, [isAuthenticated, user?.email, fetchShoppingLists]);
 
   // Update item name
   const updateItemName = useCallback(async (listId: string, itemId: string, newName: string) => {
     console.log('Updating item name:', itemId, newName);
     
-    if (isUsingSupabase && user && user.email !== mockUser.email) {
+    // Skip if this is a history item
+    if (itemId.startsWith('history-')) {
+      console.log('Cannot update history item');
+      return;
+    }
+    
+    if (isAuthenticated && user?.email) {
       try {
         const { error } = await supabase
           .from('shopping_items')
@@ -430,13 +658,19 @@ export const useShoppingLists = () => {
         })
       );
     }
-  }, [isUsingSupabase, user, fetchShoppingLists]);
+  }, [isAuthenticated, user?.email, fetchShoppingLists]);
 
   // Set item repeat
   const setItemRepeat = useCallback(async (listId: string, itemId: string) => {
     console.log('Setting item repeat:', itemId);
     
-    if (isUsingSupabase && user && user.email !== mockUser.email) {
+    // Skip if this is a history item
+    if (itemId.startsWith('history-')) {
+      console.log('Cannot update history item');
+      return;
+    }
+    
+    if (isAuthenticated && user?.email) {
       try {
         // Get current repeating status
         const { data: currentItem } = await supabase
@@ -496,13 +730,19 @@ export const useShoppingLists = () => {
         })
       );
     }
-  }, [isUsingSupabase, user, fetchShoppingLists]);
+  }, [isAuthenticated, user?.email, fetchShoppingLists]);
 
   // Remove item
   const removeItem = useCallback(async (listId: string, itemId: string) => {
     console.log('Removing item:', itemId);
     
-    if (isUsingSupabase && user && user.email !== mockUser.email) {
+    // Skip if this is a history item
+    if (itemId.startsWith('history-')) {
+      console.log('Cannot remove history item');
+      return;
+    }
+    
+    if (isAuthenticated && user?.email) {
       try {
         const { error } = await supabase
           .from('shopping_items')
@@ -534,13 +774,13 @@ export const useShoppingLists = () => {
         })
       );
     }
-  }, [isUsingSupabase, user, fetchShoppingLists]);
+  }, [isAuthenticated, user?.email, fetchShoppingLists]);
 
   // Invite member
   const inviteMember = useCallback(async (listId: string, email: string) => {
     console.log('Inviting member:', email, 'to list:', listId);
     
-    if (isUsingSupabase && user && user.email !== mockUser.email) {
+    if (isAuthenticated && user?.email) {
       try {
         // Check if already a member
         const { data: existingMember } = await supabase
@@ -597,7 +837,7 @@ export const useShoppingLists = () => {
         Alert.alert('Error', 'Failed to invite member');
       }
     } else {
-      // Local invite (show message about Supabase)
+      // Local invite (show message about authentication)
       Alert.alert(
         'Email Invitations',
         'To enable email invitations and real-time collaboration, please sign in with your email. For now, members will be added to the list locally.',
@@ -620,13 +860,13 @@ export const useShoppingLists = () => {
         })
       );
     }
-  }, [isUsingSupabase, user, fetchShoppingLists]);
+  }, [isAuthenticated, user?.email, fetchShoppingLists]);
 
   // Remove member
   const removeMember = useCallback(async (listId: string, email: string) => {
     console.log('Removing member:', email, 'from list:', listId);
     
-    if (isUsingSupabase && user && user.email !== mockUser.email) {
+    if (isAuthenticated && user?.email) {
       try {
         const { error } = await supabase
           .from('list_members')
@@ -659,23 +899,35 @@ export const useShoppingLists = () => {
         })
       );
     }
-  }, [isUsingSupabase, user, fetchShoppingLists]);
+  }, [isAuthenticated, user?.email, fetchShoppingLists]);
 
   // Clear history
   const clearListHistory = useCallback(async (listId: string) => {
     console.log('Clearing history for list:', listId);
     
-    if (isUsingSupabase && user && user.email !== mockUser.email) {
+    if (isAuthenticated && user?.email) {
       try {
-        const { error } = await supabase
+        // Delete from history_items table
+        const { error: historyError } = await supabase
+          .from('history_items')
+          .delete()
+          .eq('list_id', listId);
+
+        if (historyError) {
+          console.error('Error clearing history items:', historyError);
+          throw historyError;
+        }
+
+        // Also delete any completed shopping_items that haven't been moved to history yet
+        const { error: itemsError } = await supabase
           .from('shopping_items')
           .delete()
           .eq('list_id', listId)
           .eq('done', true);
 
-        if (error) {
-          console.error('Error clearing history:', error);
-          throw error;
+        if (itemsError) {
+          console.error('Error clearing completed items:', itemsError);
+          throw itemsError;
         }
 
         console.log('History cleared successfully');
@@ -698,13 +950,19 @@ export const useShoppingLists = () => {
         })
       );
     }
-  }, [isUsingSupabase, user, fetchShoppingLists]);
+  }, [isAuthenticated, user?.email, fetchShoppingLists]);
 
   // Update item order
   const updateItemOrder = useCallback(async (listId: string, itemId: string, newIndex: number) => {
     console.log('Updating item order:', itemId, 'to index:', newIndex);
     
-    if (isUsingSupabase && user && user.email !== mockUser.email) {
+    // Skip if this is a history item
+    if (itemId.startsWith('history-')) {
+      console.log('Cannot reorder history item');
+      return;
+    }
+    
+    if (isAuthenticated && user?.email) {
       try {
         const { error } = await supabase
           .from('shopping_items')
@@ -741,11 +999,11 @@ export const useShoppingLists = () => {
         })
       );
     }
-  }, [isUsingSupabase, user, fetchShoppingLists]);
+  }, [isAuthenticated, user?.email, fetchShoppingLists]);
 
   // Set up real-time subscriptions for Supabase
   useEffect(() => {
-    if (!isUsingSupabase || !user || user.email === mockUser.email) {
+    if (!isAuthenticated || !user?.email) {
       return;
     }
 
@@ -802,24 +1060,49 @@ export const useShoppingLists = () => {
       )
       .subscribe();
 
+    // Subscribe to history_items changes
+    const historySubscription = supabase
+      .channel('history_items_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'history_items',
+        },
+        (payload) => {
+          console.log('History change received:', payload);
+          fetchShoppingLists();
+        }
+      )
+      .subscribe();
+
     return () => {
       console.log('Cleaning up real-time subscriptions');
       itemsSubscription.unsubscribe();
       listsSubscription.unsubscribe();
       membersSubscription.unsubscribe();
+      historySubscription.unsubscribe();
     };
-  }, [isUsingSupabase, user, fetchShoppingLists]);
+  }, [isAuthenticated, user?.email, fetchShoppingLists]);
 
   // Initial fetch
   useEffect(() => {
     fetchShoppingLists();
   }, [fetchShoppingLists]);
 
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      completedItemTimeouts.forEach(timeout => clearTimeout(timeout));
+    };
+  }, [completedItemTimeouts]);
+
   return {
     shoppingLists,
     loading,
-    user,
-    isUsingSupabase,
+    user: user || mockUser,
+    isAuthenticated,
     addItem,
     toggleItemDone,
     updateItemDescription,
@@ -831,6 +1114,7 @@ export const useShoppingLists = () => {
     removeMember,
     clearListHistory,
     updateItemOrder,
+    addItemBackFromHistory,
     refreshLists: fetchShoppingLists,
   };
 };

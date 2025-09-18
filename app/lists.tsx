@@ -11,10 +11,10 @@ import Icon from '../components/Icon';
 export default function ListsScreen() {
   console.log('ListsScreen: Rendering');
   
-  const { shoppingLists, createList, loading } = useShoppingLists();
+  const { shoppingLists, createList, loading, isAuthenticated } = useShoppingLists();
   const [showCreateModal, setShowCreateModal] = useState(false);
 
-  console.log('ListsScreen: State - loading:', loading, 'lists count:', shoppingLists?.length || 0);
+  console.log('ListsScreen: State - loading:', loading, 'lists count:', shoppingLists?.length || 0, 'authenticated:', isAuthenticated);
 
   // Auto-redirect if only one list (but only after loading is complete)
   useEffect(() => {
@@ -24,14 +24,23 @@ export default function ListsScreen() {
     }
   }, [shoppingLists, loading]);
 
-  const handleCreateList = (name: string, members: string[]) => {
+  const handleCreateList = async (name: string, members: string[]) => {
     console.log('ListsScreen: Creating list:', name, 'with members:', members);
-    const newListId = createList(name, members);
-    setShowCreateModal(false);
     
-    // Navigate to the new list immediately so user can add items
-    if (newListId) {
-      router.push(`/list/${newListId}`);
+    try {
+      const newListId = await createList(name, members);
+      setShowCreateModal(false);
+      
+      // Navigate to the new list immediately so user can add items
+      if (newListId) {
+        console.log('ListsScreen: Navigating to new list:', newListId);
+        router.push(`/list/${newListId}`);
+      } else {
+        console.error('ListsScreen: Failed to create list - no ID returned');
+      }
+    } catch (error) {
+      console.error('ListsScreen: Error creating list:', error);
+      setShowCreateModal(false);
     }
   };
 
@@ -45,7 +54,10 @@ export default function ListsScreen() {
     console.log('ListsScreen: Showing loading state');
     return (
       <View style={[commonStyles.wrapper, styles.container]}>
-        <Text style={[commonStyles.text, styles.loadingText]}>Loading shopping lists...</Text>
+        <View style={styles.loadingContainer}>
+          <Icon name="basket-outline" size={48} color={colors.accent} />
+          <Text style={[commonStyles.text, styles.loadingText]}>Loading shopping lists...</Text>
+        </View>
       </View>
     );
   }
@@ -55,6 +67,16 @@ export default function ListsScreen() {
     console.log('ListsScreen: Showing empty state');
     return (
       <View style={[commonStyles.wrapper, styles.container]}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Shopping Lists</Text>
+          {!isAuthenticated && (
+            <View style={styles.offlineIndicator}>
+              <Icon name="wifi-off" size={16} color={colors.accent} />
+              <Text style={styles.offlineText}>Offline</Text>
+            </View>
+          )}
+        </View>
+        
         <View style={styles.emptyState}>
           <Icon name="basket-outline" size={64} color={colors.grey} />
           <Text style={styles.emptyTitle}>No Shopping Lists</Text>
@@ -85,7 +107,15 @@ export default function ListsScreen() {
   return (
     <View style={[commonStyles.wrapper, styles.container]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Shopping Lists</Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.title}>Shopping Lists</Text>
+          {!isAuthenticated && (
+            <View style={styles.offlineIndicator}>
+              <Icon name="wifi-off" size={16} color={colors.accent} />
+              <Text style={styles.offlineText}>Offline</Text>
+            </View>
+          )}
+        </View>
         <TouchableOpacity
           style={styles.newListButton}
           onPress={() => setShowCreateModal(true)}
@@ -120,12 +150,17 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.background,
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   loadingText: {
     color: colors.text,
     fontSize: 18,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginTop: 50,
+    marginTop: 16,
   },
   header: {
     flexDirection: 'row',
@@ -135,10 +170,29 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     backgroundColor: colors.background,
   },
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
     color: colors.text,
+  },
+  offlineIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: colors.backgroundAlt,
+    borderRadius: 12,
+  },
+  offlineText: {
+    fontSize: 12,
+    color: colors.accent,
+    marginLeft: 4,
+    fontWeight: '500',
   },
   newListButton: {
     backgroundColor: colors.accent,

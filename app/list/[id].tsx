@@ -17,6 +17,7 @@ export default function ListDetailScreen() {
   const { 
     shoppingLists, 
     user,
+    isAuthenticated,
     addItem, 
     toggleItemDone, 
     setItemRepeat, 
@@ -25,7 +26,8 @@ export default function ListDetailScreen() {
     updateItemOrder,
     clearListHistory,
     inviteMember,
-    removeMember
+    removeMember,
+    addItemBackFromHistory
   } = useShoppingLists();
 
   const [showHistory, setShowHistory] = useState(false);
@@ -40,13 +42,23 @@ export default function ListDetailScreen() {
   if (!list) {
     return (
       <View style={commonStyles.container}>
-        <Text style={commonStyles.text}>List not found</Text>
-        <Button text="Go Back" onPress={() => router.back()} />
+        <View style={styles.errorContainer}>
+          <Icon name="alert-circle-outline" size={48} color={colors.error} />
+          <Text style={styles.errorTitle}>List not found</Text>
+          <Text style={styles.errorSubtitle}>
+            The shopping list you're looking for doesn't exist or you don't have access to it.
+          </Text>
+          <Button 
+            text="Go Back" 
+            onPress={() => router.back()} 
+            style={styles.goBackButton}
+          />
+        </View>
       </View>
     );
   }
 
-  // Filter items safely with null checks - changed to 10 seconds
+  // Filter items safely with null checks - 10 seconds for completed items
   const activeItems = (list.items || [])
     .filter(item => !item.done)
     .sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -128,8 +140,8 @@ export default function ListDetailScreen() {
 
   const handleAddBackToList = (item: any) => {
     console.log('Adding item back to list:', item.name);
-    // Toggle the item back to not done
-    toggleItemDone(list.id, item.id);
+    // Create a copy of the item in the active list (keep original in history)
+    addItemBackFromHistory(list.id, item);
   };
 
   const openSettings = () => {
@@ -153,6 +165,7 @@ export default function ListDetailScreen() {
             <Text style={styles.title}>{list.name}</Text>
             <Text style={styles.subtitle}>
               {activeItems.length} active • {(list.members || []).length} members
+              {!isAuthenticated && ' • Offline Mode'}
             </Text>
           </View>
 
@@ -270,6 +283,15 @@ export default function ListDetailScreen() {
           <BottomSheetView style={styles.bottomSheetContent}>
             <Text style={styles.bottomSheetTitle}>List Settings</Text>
             
+            {!isAuthenticated && (
+              <View style={styles.offlineNotice}>
+                <Icon name="wifi-off" size={20} color={colors.accent} />
+                <Text style={styles.offlineText}>
+                  You're in offline mode. Sign in to enable real-time collaboration and sync across devices.
+                </Text>
+              </View>
+            )}
+            
             <View style={styles.membersSection}>
               <Text style={styles.sectionTitle}>Members ({(list.members || []).length})</Text>
               {(list.members || []).map((email) => (
@@ -378,6 +400,32 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.text,
+    marginTop: 16,
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  errorSubtitle: {
+    fontSize: 16,
+    color: colors.text,
+    opacity: 0.7,
+    marginBottom: 32,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  goBackButton: {
+    backgroundColor: colors.accent,
+    paddingHorizontal: 32,
+  },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -448,6 +496,21 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 20,
     textAlign: 'center',
+  },
+  offlineNotice: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  offlineText: {
+    fontSize: 14,
+    color: colors.text,
+    marginLeft: 8,
+    flex: 1,
+    lineHeight: 18,
   },
   membersSection: {
     marginBottom: 20,
