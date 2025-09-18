@@ -28,18 +28,34 @@ export const useShoppingLists = () => {
 
   // Fetch history items from Supabase
   const fetchHistoryItems = useCallback(async () => {
-    if (!user?.email) return [];
+    if (!user?.email) {
+      console.log('fetchHistoryItems: No user email, returning empty array');
+      return [];
+    }
 
     try {
-      const { data: memberLists } = await supabase
-        .from('list_members')
-        .select('list_id')
-        .eq('email', user.email);
+      console.log('fetchHistoryItems: Fetching history for user:', user.email);
+      
+      // Get all accessible lists first
+      console.log('fetchHistoryItems: Getting accessible lists...');
+      const { data: accessibleLists, error: listsError } = await supabase
+        .from('shopping_lists')
+        .select('id');
 
-      if (!memberLists || memberLists.length === 0) return [];
+      if (listsError) {
+        console.error('fetchHistoryItems: Error fetching accessible lists:', listsError);
+        return [];
+      }
 
-      const listIds = memberLists.map(ml => ml.list_id);
+      if (!accessibleLists || accessibleLists.length === 0) {
+        console.log('fetchHistoryItems: No accessible lists found');
+        return [];
+      }
 
+      console.log('fetchHistoryItems: Found', accessibleLists.length, 'accessible lists');
+      const listIds = accessibleLists.map(list => list.id);
+
+      console.log('fetchHistoryItems: Fetching history items for list IDs:', listIds);
       const { data: history, error } = await supabase
         .from('history_items')
         .select('*')
@@ -47,63 +63,46 @@ export const useShoppingLists = () => {
         .order('completed_at', { ascending: false });
 
       if (error) {
-        console.error('Error fetching history:', error);
+        console.error('fetchHistoryItems: Error fetching history:', error);
         return [];
       }
 
+      console.log('fetchHistoryItems: Found', history?.length || 0, 'history items');
       return history || [];
     } catch (error) {
-      console.error('Error fetching history items:', error);
+      console.error('fetchHistoryItems: Error fetching history items:', error);
       return [];
     }
   }, [user?.email]);
 
   // Fetch shopping lists from Supabase
   const fetchSupabaseLists = useCallback(async () => {
-    if (!user?.email) return [];
+    if (!user?.email) {
+      console.log('fetchSupabaseLists: No user email, returning empty array');
+      return [];
+    }
 
     try {
-      console.log('Fetching lists from Supabase for user:', user.email);
+      console.log('fetchSupabaseLists: Fetching lists from Supabase for user:', user.email);
       
-      // Get lists where user is owner or member
-      const { data: ownedLists, error: ownedError } = await supabase
+      // Get all lists the user has access to (owned or member)
+      // The RLS policy should now handle both cases without circular dependency
+      console.log('fetchSupabaseLists: Querying shopping_lists table...');
+      const { data: allLists, error: listsError } = await supabase
         .from('shopping_lists')
         .select('*')
-        .eq('owner', user.email);
+        .order('created_at', { ascending: false });
 
-      if (ownedError) {
-        console.error('Error fetching owned lists:', ownedError);
+      if (listsError) {
+        console.error('fetchSupabaseLists: Error fetching lists:', listsError);
+        console.error('fetchSupabaseLists: Error code:', listsError.code);
+        console.error('fetchSupabaseLists: Error message:', listsError.message);
+        throw listsError;
       }
 
-      const { data: memberLists, error: memberError } = await supabase
-        .from('list_members')
-        .select(`
-          list_id,
-          shopping_lists!inner (
-            id,
-            name,
-            owner,
-            created_at,
-            updated_at
-          )
-        `)
-        .eq('email', user.email);
+      console.log('fetchSupabaseLists: Found accessible lists:', allLists?.length || 0);
 
-      if (memberError) {
-        console.error('Error fetching member lists:', memberError);
-      }
-
-      // Combine owned and member lists, avoiding duplicates
-      const allLists = [...(ownedLists || [])];
-      
-      for (const memberList of memberLists || []) {
-        const listData = memberList.shopping_lists;
-        if (!allLists.find(list => list.id === listData.id)) {
-          allLists.push(listData);
-        }
-      }
-
-      console.log('All accessible lists:', allLists.length);
+      console.log('fetchSupabaseLists: Found accessible lists:', allLists?.length || 0);
 
       if (allLists.length === 0) {
         console.log('No lists found for user:', user.email);
@@ -113,9 +112,13 @@ export const useShoppingLists = () => {
       // Get items and members for each list
       const listsWithItems: ShoppingList[] = [];
       
+      console.log('fetchSupabaseLists: Processing', allLists.length, 'lists...');
+      
       for (const listData of allLists) {
+        console.log('fetchSupabaseLists: Processing list:', listData.name, 'ID:', listData.id);
         
         // Get items for this list
+        console.log('fetchSupabaseLists: Fetching items for list:', listData.id);
         const { data: items, error: itemsError } = await supabase
           .from('shopping_items')
           .select('*')
@@ -123,22 +126,41 @@ export const useShoppingLists = () => {
           .order('order_index');
 
         if (itemsError) {
-          console.error('Error fetching items:', itemsError);
+          console.error('fetchSupabaseLists: Error fetching items for list', listData.id, ':', itemsError);
           continue;
         }
 
+        console.log('fetchSupabaseLists: Found', items?.length || 0, 'items for list:', listData.name);
+
         // Get members for this list
-        const { data: members, error: membersError } = await supabase
+        // Due to RLS, users can only see their own membership record
+        // So we'll get what we can and include the owner
+        console.log('fetchSupabaseLists: Fetching members for list:', listData.id);
+        const { data: visibleMembers, error: membersError } = await supabase
           .from('list_members')
           .select('email')
           .eq('list_id', listData.id);
 
         if (membersError) {
-          console.error('Error fetching members:', membersError);
-          continue;
+          console.error('fetchSupabaseLists: Error fetching members for list', listData.id, ':', membersError);
         }
 
+        console.log('fetchSupabaseLists: Found', visibleMembers?.length || 0, 'visible members for list:', listData.name);
+
+        // Always include the list owner and any visible members
+        const members = [listData.owner];
+        if (visibleMembers) {
+          for (const member of visibleMembers) {
+            if (!members.includes(member.email)) {
+              members.push(member.email);
+            }
+          }
+        }
+
+        console.log('fetchSupabaseLists: Total members for list', listData.name, ':', members);
+
         // Get history items for this list
+        console.log('fetchSupabaseLists: Fetching history for list:', listData.id);
         const { data: history, error: historyError } = await supabase
           .from('history_items')
           .select('*')
@@ -146,8 +168,10 @@ export const useShoppingLists = () => {
           .order('completed_at', { ascending: false });
 
         if (historyError) {
-          console.error('Error fetching history:', historyError);
+          console.error('fetchSupabaseLists: Error fetching history for list', listData.id, ':', historyError);
         }
+
+        console.log('fetchSupabaseLists: Found', history?.length || 0, 'history items for list:', listData.name);
 
         const shoppingItems: ShoppingItem[] = (items || []).map(item => ({
           id: item.id,
@@ -172,16 +196,19 @@ export const useShoppingLists = () => {
           order: 0,
         }));
 
-        listsWithItems.push({
+        const finalList = {
           id: listData.id,
           name: listData.name,
           items: [...shoppingItems, ...historyAsItems],
-          members: (members || []).map(m => m.email),
+          members: members,
           owner: listData.owner,
-        });
+        };
+
+        console.log('fetchSupabaseLists: Created final list object for:', listData.name, 'with', finalList.items.length, 'total items');
+        listsWithItems.push(finalList);
       }
 
-      console.log('Fetched lists with items:', listsWithItems.length);
+      console.log('fetchSupabaseLists: Completed processing. Total lists with items:', listsWithItems.length);
       return listsWithItems;
     } catch (error) {
       console.error('Error fetching Supabase lists:', error);
@@ -191,30 +218,38 @@ export const useShoppingLists = () => {
 
   // Main fetch function
   const fetchShoppingLists = useCallback(async () => {
-    console.log('Fetching shopping lists...');
+    console.log('fetchShoppingLists: Starting fetch...');
+    console.log('fetchShoppingLists: isAuthenticated:', isAuthenticated);
+    console.log('fetchShoppingLists: user email:', user?.email);
     setLoading(true);
 
     try {
       if (isAuthenticated && user?.email) {
-        console.log('Fetching from Supabase for user:', user.email);
+        console.log('fetchShoppingLists: Fetching from Supabase for user:', user.email);
         const supabaseLists = await fetchSupabaseLists();
+        console.log('fetchShoppingLists: Got lists from Supabase:', supabaseLists.length);
+        
         const history = await fetchHistoryItems();
+        console.log('fetchShoppingLists: Got history items:', history.length);
+        
         setShoppingLists(supabaseLists);
         setHistoryItems(history);
-        console.log('Successfully fetched', supabaseLists.length, 'lists from Supabase');
+        console.log('fetchShoppingLists: Successfully set', supabaseLists.length, 'lists from Supabase');
       } else {
         // Use mock data for unauthenticated users
-        console.log('Using mock data - user not authenticated');
+        console.log('fetchShoppingLists: Using mock data - user not authenticated');
         setShoppingLists(mockShoppingLists);
         setHistoryItems([]);
       }
     } catch (error) {
-      console.error('Error in fetchShoppingLists:', error);
-      Alert.alert('Error', 'Failed to load shopping lists. Using offline mode.');
+      console.error('fetchShoppingLists: Error in fetchShoppingLists:', error);
+      console.error('fetchShoppingLists: Error details:', error.message, error.code);
+      Alert.alert('Error', `Failed to load shopping lists: ${error.message || 'Unknown error'}. Using offline mode.`);
       setShoppingLists(mockShoppingLists);
       setHistoryItems([]);
     } finally {
       setLoading(false);
+      console.log('fetchShoppingLists: Fetch completed');
     }
   }, [isAuthenticated, user?.email, fetchSupabaseLists, fetchHistoryItems]);
 
