@@ -5,6 +5,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { useShoppingLists } from '../../hooks/useShoppingLists';
+import { useAuth } from '../../hooks/useAuth';
 import { commonStyles, colors } from '../../styles/commonStyles';
 import ShoppingItem from '../../components/ShoppingItem';
 import AddItemInput from '../../components/AddItemInput';
@@ -29,6 +30,8 @@ export default function ListDetailScreen() {
     removeMember,
     addItemBackFromHistory
   } = useShoppingLists();
+
+  const { signOut } = useAuth();
 
   const [showHistory, setShowHistory] = useState(false);
   const [showInviteInput, setShowInviteInput] = useState(false);
@@ -142,6 +145,24 @@ export default function ListDetailScreen() {
     console.log('Adding item back to list:', item.name);
     // Create a copy of the item in the active list (keep original in history)
     addItemBackFromHistory(list.id, item);
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Sign Out',
+      'Are you sure you want to sign out? You will lose access to your synced lists.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Sign Out', 
+          style: 'destructive',
+          onPress: async () => {
+            await signOut();
+            router.replace('/');
+          }
+        }
+      ]
+    );
   };
 
   const openSettings = () => {
@@ -352,6 +373,39 @@ export default function ListDetailScreen() {
                 style={styles.inviteButton}
               />
             )}
+
+            {/* Account Section */}
+            <View style={styles.accountSection}>
+              <Text style={styles.sectionTitle}>Account</Text>
+              {isAuthenticated ? (
+                <View>
+                  <View style={styles.accountInfo}>
+                    <Icon name="person-circle" size={20} color={colors.text} />
+                    <Text style={styles.accountEmail}>{user?.email}</Text>
+                  </View>
+                  <Button
+                    text="Sign Out"
+                    onPress={handleLogout}
+                    style={styles.logoutButton}
+                    textStyle={styles.logoutButtonText}
+                  />
+                </View>
+              ) : (
+                <View style={styles.signInPrompt}>
+                  <Text style={styles.signInText}>
+                    Sign in to sync your lists across devices and collaborate with others.
+                  </Text>
+                  <Button
+                    text="Sign In"
+                    onPress={() => {
+                      bottomSheetRef.current?.close();
+                      router.push('/');
+                    }}
+                    style={styles.signInButton}
+                  />
+                </View>
+              )}
+            </View>
           </BottomSheetView>
         </BottomSheet>
 
@@ -579,5 +633,46 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.accent,
     marginLeft: 8,
+  },
+  accountSection: {
+    marginTop: 20,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: colors.background,
+  },
+  accountInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  accountEmail: {
+    fontSize: 14,
+    color: colors.text,
+    marginLeft: 8,
+    flex: 1,
+  },
+  logoutButton: {
+    backgroundColor: colors.error,
+  },
+  logoutButtonText: {
+    color: colors.background,
+  },
+  signInPrompt: {
+    padding: 16,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+  },
+  signInText: {
+    fontSize: 14,
+    color: colors.text,
+    lineHeight: 18,
+    marginBottom: 12,
+  },
+  signInButton: {
+    backgroundColor: colors.accent,
   },
 });

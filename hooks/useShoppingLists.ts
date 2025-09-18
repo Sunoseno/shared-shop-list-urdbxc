@@ -193,28 +193,36 @@ export const useShoppingLists = () => {
     }
   }, [isAuthenticated, user?.email, fetchSupabaseLists, fetchHistoryItems]);
 
-  // Create new list
+  // Create new list - FIXED: Don't set ID manually, let database generate it
   const createList = useCallback(async (listName: string, initialMembers: string[] = []) => {
     console.log('Creating list:', listName, 'with members:', initialMembers);
     
     if (isAuthenticated && user?.email) {
       try {
-        const listId = uuid.v4() as string;
         const userEmail = user.email;
 
-        // Create the list
-        const { error: listError } = await supabase
+        // Create the list - let database generate the ID
+        const { data: newList, error: listError } = await supabase
           .from('shopping_lists')
           .insert({
-            id: listId,
             name: listName,
             owner: userEmail,
-          });
+          })
+          .select('id')
+          .single();
 
         if (listError) {
           console.error('Error creating list:', listError);
           throw listError;
         }
+
+        if (!newList?.id) {
+          console.error('No list ID returned from database');
+          throw new Error('No list ID returned from database');
+        }
+
+        const listId = newList.id;
+        console.log('List created with ID:', listId);
 
         // Add owner as member
         const { error: ownerError } = await supabase
