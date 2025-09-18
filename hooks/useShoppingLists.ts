@@ -65,7 +65,16 @@ export const useShoppingLists = () => {
     try {
       console.log('Fetching lists from Supabase for user:', user.email);
       
-      // Get lists where user is a member
+      // Get lists where user is owner or member
+      const { data: ownedLists, error: ownedError } = await supabase
+        .from('shopping_lists')
+        .select('*')
+        .eq('owner', user.email);
+
+      if (ownedError) {
+        console.error('Error fetching owned lists:', ownedError);
+      }
+
       const { data: memberLists, error: memberError } = await supabase
         .from('list_members')
         .select(`
@@ -82,16 +91,29 @@ export const useShoppingLists = () => {
 
       if (memberError) {
         console.error('Error fetching member lists:', memberError);
-        return [];
       }
 
-      console.log('Member lists:', memberLists);
+      // Combine owned and member lists, avoiding duplicates
+      const allLists = [...(ownedLists || [])];
+      
+      for (const memberList of memberLists || []) {
+        const listData = memberList.shopping_lists;
+        if (!allLists.find(list => list.id === listData.id)) {
+          allLists.push(listData);
+        }
+      }
+
+      console.log('All accessible lists:', allLists.length);
+
+      if (allLists.length === 0) {
+        console.log('No lists found for user:', user.email);
+        return [];
+      }
 
       // Get items and members for each list
       const listsWithItems: ShoppingList[] = [];
       
-      for (const memberList of memberLists || []) {
-        const listData = memberList.shopping_lists;
+      for (const listData of allLists) {
         
         // Get items for this list
         const { data: items, error: itemsError } = await supabase
@@ -174,10 +196,12 @@ export const useShoppingLists = () => {
 
     try {
       if (isAuthenticated && user?.email) {
+        console.log('Fetching from Supabase for user:', user.email);
         const supabaseLists = await fetchSupabaseLists();
         const history = await fetchHistoryItems();
         setShoppingLists(supabaseLists);
         setHistoryItems(history);
+        console.log('Successfully fetched', supabaseLists.length, 'lists from Supabase');
       } else {
         // Use mock data for unauthenticated users
         console.log('Using mock data - user not authenticated');
@@ -186,6 +210,7 @@ export const useShoppingLists = () => {
       }
     } catch (error) {
       console.error('Error in fetchShoppingLists:', error);
+      Alert.alert('Error', 'Failed to load shopping lists. Using offline mode.');
       setShoppingLists(mockShoppingLists);
       setHistoryItems([]);
     } finally {
@@ -213,35 +238,30 @@ export const useShoppingLists = () => {
 
         if (listError) {
           console.error('Error creating list:', listError);
-          throw listError;
+          Alert.alert('Error', `Failed to create list: ${listError.message}`);
+          return null;
         }
 
         if (!newList?.id) {
           console.error('No list ID returned from database');
-          throw new Error('No list ID returned from database');
+          Alert.alert('Error', 'Failed to create list - no ID returned');
+          return null;
         }
 
         const listId = newList.id;
         console.log('List created with ID:', listId);
 
-        // Add owner as member
-        const { error: ownerError } = await supabase
-          .from('list_members')
-          .insert({
-            list_id: listId,
-            email: userEmail,
-            role: 'owner',
-          });
-
-        if (ownerError) {
-          console.error('Error adding owner as member:', ownerError);
-          throw ownerError;
-        }
+        // Owner is automatically added as member by database trigger
 
         // Add initial members
         for (const email of initialMembers) {
           if (email && email !== userEmail) {
-            await inviteMember(listId, email);
+            try {
+              await inviteMember(listId, email);
+            } catch (memberError) {
+              console.error('Error adding member:', email, memberError);
+              // Continue with other members even if one fails
+            }
           }
         }
 
@@ -250,7 +270,7 @@ export const useShoppingLists = () => {
         return listId;
       } catch (error) {
         console.error('Error creating list:', error);
-        Alert.alert('Error', 'Failed to create list');
+        Alert.alert('Error', `Failed to create list: ${error.message || 'Unknown error'}`);
         return null;
       }
     } else {
@@ -340,15 +360,55 @@ export const useShoppingLists = () => {
     
     if (isAuthenticated && user?.email) {
       try {
-        // Call the database function to move items to history
-        const { error } = await supabase.rpc('move_completed_items_to_history');
-        
-        if (error) {
-          console.error('Error moving items to history:', error);
-        } else {
-          console.log('Items moved to history successfully');
-          await fetchShoppingLists();
+        // First, get the item details
+        const { data: item, error: itemError } = await supabase
+          .from('shopping_items')
+          .select('*')
+          .eq('id', itemId)
+          .eq('done', true)
+          .single();
+
+        if (itemError || !item) {
+          console.log('Item not found or not completed, skipping history move');
+          return;
         }
+
+        // Check if item has been completed for more than 10 seconds
+        if (!item.done_at || (Date.now() - new Date(item.done_at).getTime()) < 10000) {
+          console.log('Item not ready for history move yet');
+          return;
+        }
+
+        // Move to history
+        const { error: historyError } = await supabase
+          .from('history_items')
+          .insert({
+            list_id: item.list_id,
+            original_item_id: item.id,
+            name: item.name,
+            description: item.description || '',
+            completed_at: item.done_at,
+            repeating: item.repeating || 'none',
+          });
+
+        if (historyError) {
+          console.error('Error adding to history:', historyError);
+          return;
+        }
+
+        // Delete from shopping_items
+        const { error: deleteError } = await supabase
+          .from('shopping_items')
+          .delete()
+          .eq('id', itemId);
+
+        if (deleteError) {
+          console.error('Error deleting item:', deleteError);
+          return;
+        }
+
+        console.log('Item moved to history successfully');
+        await fetchShoppingLists();
       } catch (error) {
         console.error('Error in moveItemToHistory:', error);
       }
@@ -791,12 +851,17 @@ export const useShoppingLists = () => {
     if (isAuthenticated && user?.email) {
       try {
         // Check if already a member
-        const { data: existingMember } = await supabase
+        const { data: existingMember, error: checkError } = await supabase
           .from('list_members')
           .select('id')
           .eq('list_id', listId)
           .eq('email', email)
-          .single();
+          .maybeSingle();
+
+        if (checkError) {
+          console.error('Error checking existing member:', checkError);
+          throw checkError;
+        }
 
         if (existingMember) {
           Alert.alert('Info', 'User is already a member of this list');
@@ -820,7 +885,7 @@ export const useShoppingLists = () => {
 
         if (inviteError) {
           console.error('Error creating invitation:', inviteError);
-          throw inviteError;
+          // Don't throw here, continue with adding member
         }
 
         // For now, automatically add the member (in a real app, you'd send an email)
@@ -834,7 +899,8 @@ export const useShoppingLists = () => {
 
         if (memberError) {
           console.error('Error adding member:', memberError);
-          throw memberError;
+          Alert.alert('Error', `Failed to add member: ${memberError.message}`);
+          return;
         }
 
         console.log('Member invited successfully');
@@ -842,7 +908,7 @@ export const useShoppingLists = () => {
         await fetchShoppingLists();
       } catch (error) {
         console.error('Error inviting member:', error);
-        Alert.alert('Error', 'Failed to invite member');
+        Alert.alert('Error', `Failed to invite member: ${error.message || 'Unknown error'}`);
       }
     } else {
       // Local invite (show message about authentication)

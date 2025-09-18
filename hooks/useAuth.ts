@@ -97,7 +97,7 @@ export const useAuth = () => {
       setRememberMe(remember);
       console.log('useAuth: Remember me preference saved:', remember);
 
-      console.log('useAuth: Email sign in successful');
+      console.log('useAuth: Email sign in successful for user:', data.user?.email);
       return { user: data.user, error: null };
     } catch (error) {
       console.error('useAuth: Email sign in exception:', error);
